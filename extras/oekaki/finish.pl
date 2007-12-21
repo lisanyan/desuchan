@@ -5,6 +5,7 @@ use CGI::Carp qw(fatalsToBrowser);
 use strict;
 
 use CGI;
+use DBI;
 
 
 
@@ -52,20 +53,55 @@ die unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
 
 my $tmpname=TMP_DIR.$oek_ip.'.png';
 
+my $num=$query->param("num");
+my $dummy=$query->param("dummy");
+
 if(!$task)
 {
 	my $oek_parent=$query->param("oek_parent");
 	my $srcinfo=$query->param("srcinfo");
+	my $oek_editing=$query->param("oek_editing");
+	my $password=$query->param("password");
 
 	make_http_header();
 
-	print OEKAKI_FINISH_TEMPLATE->(
-		tmpname=>$tmpname,
-		oek_parent=>clean_string($oek_parent),
-		oek_ip=>$oek_ip,
-		srcinfo=>clean_string($srcinfo),
-		decodedinfo=>OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo)),
-	);
+	if (!$oek_editing)
+	{
+		print OEKAKI_FINISH_TEMPLATE->(
+			tmpname=>$tmpname,
+			oek_parent=>clean_string($oek_parent),
+			oek_ip=>$oek_ip,
+			srcinfo=>clean_string($srcinfo),
+			dummy=>$dummy,
+			decodedinfo=>OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo))
+		);
+	}
+	else
+	{
+		
+		require "wakaba.pl";
+		
+		my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or make_error(S_SQLCONF);
+		my $sth = $dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num = ?;");
+		$sth->execute($num);
+		my $row = get_decoded_hashref($sth);
+		
+		print OEKAKI_FINISH_EDIT_TEMPLATE->(
+			tmpname=>$tmpname,
+			oek_parent=>clean_string($oek_parent),
+			oek_ip=>$oek_ip,
+			srcinfo=>clean_string($srcinfo),
+			decodedinfo=>OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo)),
+			num=>$num,
+			dummy => $dummy,
+			comment=>tag_killa($$row{comment}),
+			name=>$$row{name},
+			email=>$$row{email},
+			subject=>$$row{subject},
+			password=>$password
+		);
+		$sth->finish();
+	}
 }
 elsif($task eq "post")
 {
@@ -73,24 +109,54 @@ elsif($task eq "post")
 
 	my $parent=$query->param("parent");
 	my $name=$query->param("field1");
-	my $email=$query->param("field2");
-	my $subject=$query->param("field3");
-	my $comment=$query->param("field4");
+	my $email=$query->param("email");
+	my $subject=$query->param("subject");
+	my $comment=$query->param("comment");
 	my $password=$query->param("password");
 	my $captcha=$query->param("captcha");
 	my $srcinfo=$query->param("srcinfo");
-
+	
 	$ENV{SCRIPT_NAME}=~s/\w+\.pl$/wakaba.pl/;
 
 	open TMPFILE,$tmpname or die "Can't read uploaded file";
 
 	post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,
-	0,$captcha,ADMIN_PASS,0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo)));
+	0,$captcha,ADMIN_PASS,0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo)),,);
 
 	unlink $tmpname;
 }
+elsif ($task eq "edit")
+{
+	require "wakaba.pl";
+	
+	my $name=$query->param("field1");
+	my $email=$query->param("email");
+	my $subject=$query->param("subject");
+	my $comment=$query->param("comment");
+	my $password=$query->param("password");
+	my $captcha=$query->param("captcha");
+	my $srcinfo=$query->param("srcinfo");
+	my $password=$query->param("password");
+	
+	my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or make_error(S_SQLCONF);
+	my $sth = $dbh->prepare("SELECT password FROM ".SQL_TABLE." WHERE num = ?;");
+	$sth->execute($num);
+	my $row = get_decoded_hashref($sth);
+	
+	make_error(S_BADEDITPASS) if ($$row{password} ne $password);
+	
+	$sth->finish();
+	
+	$ENV{SCRIPT_NAME}=~s/\w+\.pl$/wakaba.pl/;
 
+	open TMPFILE,$tmpname or die "Can't read uploaded file";
 
+	edit_shit($num,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,
+	$captcha,ADMIN_PASS,0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo)));
+	
+	unlink $tmpname;
+	
+}
 
 sub make_http_header()
 {
@@ -111,7 +177,7 @@ sub expand_filename($)
 	return $self_path.$filename;
 }
 
-sub decode_srcinfo($)
+sub decode_srcinfo($$)
 {
 	my ($srcinfo)=@_;
 	my @info=split /,/,$srcinfo;

@@ -1,7 +1,5 @@
 use strict;
 
-use strict;
-
 BEGIN { require 'oekaki_config.pl'; }
 BEGIN { require 'oekaki_strings_en.pl'; }
 BEGIN { require 'futaba_style.pl'; }
@@ -12,6 +10,7 @@ BEGIN { $SIG{'__WARN__'} = sub {} } # kill warnings when redefining PAGE_TEMPLAT
 
 use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
+<if $lockedthread ne 'yes'>
 <if $thread>
 	[<a href="<var expand_filename(HTML_SELF)>"><const S_RETURN></a>]
 	<div class="theader"><const S_POSTING></div>
@@ -37,6 +36,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <const S_OEKX><input type="text" name="oek_x" size="3" value="<const OEKAKI_DEFAULT_X>" />
 <const S_OEKY><input type="text" name="oek_y" size="3" value="<const OEKAKI_DEFAULT_Y>" />
+<if $thread><input type="hidden" name="dummy" value="<var $dummy>" /></if>
 
 <if OEKAKI_ENABLE_MODIFY and $thread>
 	<const S_OEKSOURCE>
@@ -67,14 +67,14 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 		<input type="hidden" name="nofile" value="1" />
 	</if>
 	<if FORCED_ANON><input type="hidden" name="name" /></if>
-	<if SPAM_TRAP><div class="trap"><const S_SPAMTRAP><input type="text" name="name" size="28" autocomplete="off" /><input type="text" name="link" size="28" autocomplete="off" /></div></if>
+	<if SPAM_TRAP><div class="trap"><const S_SPAMTRAP><input type="text" name="name" size="28" /><input type="text" name="link" size="28" /></div></if>
 
 	<table><tbody>
 	<if !FORCED_ANON><tr><td class="postblock"><const S_NAME></td><td><input type="text" name="field1" size="28" /></td></tr></if>
-	<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="field2" size="28" /></td></tr>
-	<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="field3" size="35" />
+	<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="email" size="28" /></td></tr>
+	<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="subject" size="35" />
 	<input type="submit" value="<const S_SUBMIT>" /></td></tr>
-	<tr><td class="postblock"><const S_COMMENT></td><td><textarea name="field4" cols="48" rows="4"></textarea></td></tr>
+	<tr><td class="postblock"><const S_COMMENT></td><td><textarea name="comment" cols="48" rows="4"></textarea></td></tr>
 
 	<if $image_inp>
 		<tr><td class="postblock"><const S_UPLOADFILE></td><td><input type="file" name="file" size="35" />
@@ -94,14 +94,33 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 	</tbody></table></form></div>
 	<script type="text/javascript">set_inputs("postform")</script>
 
-	<hr />
 </if>
+</if>
+
+<if $lockedthread eq 'yes'>
+	[<a href="<var expand_filename(HTML_SELF)>"><const S_RETURN></a>]
+	<p style="font-weight:bold;font-size:1.2em"><const S_LOCKEDANNOUNCE></p>
+</if>
+
+<hr />
+
+<script type="text/javascript">
+	var hiddenThreads=get_cookie(thread_cookie);
+</script>
 
 <form id="delform" action="<var $self>" method="post">
 
 <loop $threads>
 	<loop $posts>
 		<if !$parent>
+			<div id="t<var $num>_info" style="float:left">
+			</div>
+
+			<if !$thread>
+				<span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">(&minus;) Hide Thread</a></span>
+			</if>
+
+			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
 				-(<em><var $size> B, <var $width>x<var $height></em>)</span>
@@ -127,23 +146,45 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<span class="filetitle"><var $subject></span>
 			<if $email><span class="postername"><a href="<var $email>"><var $name></a></span><if $trip><span class="postertrip"><a href="<var $email>"><var $trip></a></span></if></if>
 			<if !$email><span class="postername"><var $name></span><if $trip><span class="postertrip"><var $trip></span></if></if>
+			<if $stickied> <img src="<var expand_filename('include/sticky.gif')>" alt="<const S_STICKIEDALT>" title="<const S_STICKIED>" /> </if>
+
+			<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
+
 			<var $date></label>
 			<span class="reflink">
 			<if !$thread><a href="<var get_reply_link($num,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
-			<if !$thread>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a>]</if>
+			<span class="deletelink">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
+				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			</span>&nbsp;
+			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
+			<if !$thread>
+			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a>]</if>
+			<if $locked eq 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_VIEW></a>]</if>
+			</if>
 
 			<blockquote>
 			<var $comment>
 			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,get_reply_link($num,$parent))></div></if>
+			<if $lastedit><p style="font-size: small; font-style: italic"><const S_LASTEDITED><if $admin_post eq 'yes'> <const S_BYMOD></if> <var $lastedit>.</p></if>
 			</blockquote>
-
 			<if $omit>
 				<span class="omittedposts">
-				<if $omitimages><var sprintf S_ABBRIMG,$omit,$omitimages></if>
-				<if !$omitimages><var sprintf S_ABBR,$omit></if>
+				<if $omitimages && !$locked><var sprintf S_ABBRIMG,$omit,$omitimages></if>
+				<if $omitimages && $locked><var sprintf S_ABBRIMG_LOCK, $omit, $omitimages></if>
+				<if !$omitimages && !$locked><var sprintf S_ABBR,$omit></if>
+				<if !$omitimages && $locked><var sprintf S_ABBR_LOCK,$omit></if>
 				</span>
+			</if>
+			<if !$thread>
+				<script type="text/javascript">
+					if (hiddenThreads.indexOf('t<var $num>,') != -1)
+					{
+						toggleHidden('t<var $num>');	
+					}
+				</script>
 			</if>
 		</if>
 		<if $parent>
@@ -160,6 +201,11 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$thread><a href="<var get_reply_link($parent,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
+			<span class="deletelink">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
+				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			</span>&nbsp;
+			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
 
 			<if $image>
 				<br />
@@ -185,11 +231,14 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<blockquote>
 			<var $comment>
 			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,get_reply_link($num,$parent))></div></if>
+			<if $lastedit><p style="font-size: small; font-style: italic"><const S_LASTEDITED><if $admin_post eq 'yes'> <const S_BYMOD></if> <var $lastedit>.</p></if>
 			</blockquote>
 
 			</td></tr></tbody></table>
 		</if>
 	</loop>
+	
+	</div>
 	<br clear="left" /><hr />
 </loop>
 
@@ -219,8 +268,10 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 	<if $nextpage><form method="get" action="<var $nextpage>"><input value="<const S_NEXT>" type="submit" /></form></if>
 	<if !$nextpage><const S_LASTPG></if>
 
-	</td></tr></tbody></table><br clear="all" />
+	</td></tr></tbody></table>
 </if>
+
+<br clear="all" />
 
 }.NORMAL_FOOT_INCLUDE);
 
@@ -255,7 +306,7 @@ table.nospace tr td { margin:0px; }
 <param name="tools" value="<var $mode>" />
 <param name="layer_count" value="3" />
 <param name="url_save" value="getpic.pl" />
-<param name="url_exit" value="finish.pl?oek_parent=<var $oek_parent>&amp;oek_ip=<var $ip>&amp;srcinfo=<var $time>,<var $oek_painter>,<var $oek_src>" />
+<param name="url_exit" value="finish.pl?oek_parent=<var $oek_parent>&amp;oek_ip=<var $ip>&amp;<if $oek_editing>oek_editing=1&amp;password=<var $password>&amp;num=<var $num>&amp;</if>dummy=<var $dummy>&amp;srcinfo=<var $time>,<var $oek_painter>,<var $oek_src>" />
 <param name="send_header" value="<var $ip>" />
 </applet>
 </td>
@@ -276,6 +327,12 @@ Oekaki post</strong> (Time: <var $time>, Painter: <var $painter><if $source>, So
 </small></p>
 });
 
+use constant OEKAKI_EDIT_INFO_TEMPLATE => compile_template(q{
+<p><small><strong>
+Edited in Oekaki</strong> (Time: <var $time>, Painter: <var $painter>)
+</small></p>
+});
+
 
 use constant OEKAKI_FINISH_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
@@ -289,10 +346,10 @@ use constant OEKAKI_FINISH_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 <input type="hidden" name="srcinfo" value="<var $srcinfo>" />
 <table><tbody>
 <tr><td class="postblock"><const S_NAME></td><td><input type="text" name="field1" size="28" /></td></tr>
-<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="field2" size="28" /></td></tr>
-<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="field3" size="35" />
+<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="email" size="28" /></td></tr>
+<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="subject" size="35" />
 <input type="submit" value="<const S_SUBMIT>" /></td></tr>
-<tr><td class="postblock"><const S_COMMENT></td><td><textarea name="field4" cols="48" rows="4"></textarea></td></tr>
+<tr><td class="postblock"><const S_COMMENT></td><td><textarea name="comment" cols="48" rows="4"></textarea></td></tr>
 
 <if $image_inp>
 	<tr><td class="postblock"><const S_UPLOADFILE></td><td><input type="file" name="file" size="35" />
@@ -302,7 +359,7 @@ use constant OEKAKI_FINISH_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <if ENABLE_CAPTCHA and !$admin>
 	<tr><td class="postblock"><const S_CAPTCHA></td><td><input type="text" name="captcha" size="10" />
-	<img alt="" src="<var expand_filename(CAPTCHA_SCRIPT)>?key=<var get_captcha_key($thread)>&amp;dummy=<var $dummy>" />
+	<img alt="" src="<var expand_filename(CAPTCHA_SCRIPT)>?key=<if $oek_parent>res<var $oek_parent></if><if !$oek_parent>mainpage</if>&amp;dummy=<var $dummy>" />
 	</td></tr>
 </if>
 
@@ -330,7 +387,119 @@ use constant OEKAKI_FINISH_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 }.NORMAL_FOOT_INCLUDE);
 
+use constant OEKAKI_FINISH_EDIT_TEMPLATE => compile_template(MINI_HEAD_INCLUDE.q{
 
+<h1 style="text-align:center;font-size:1em">Now Editing Post No.<var $num></h1>
+<div class="postarea">
+<form id="postform" action="<var $self>" method="post" enctype="multipart/form-data">
+<input type="hidden" name="task" value="edit" />
+<input type="hidden" name="oek_ip" value="<var $oek_ip>" />
+<input type="hidden" name="srcinfo" value="<var $srcinfo>" />
+<input type="hidden" name="num" value="<var $num>" />
+<table><tbody>
+<tr><td class="postblock"><const S_NAME></td><td><input type="text" name="field1" size="28" value="<var $name>" /></td></tr>
+<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="email" size="28" value="<var $email>" /></td></tr>
+<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="subject" size="35" value="<var $subject>" />
+<input type="submit" value="<const S_SUBMIT>" /></td></tr>
+<tr><td class="postblock"><const S_COMMENT></td><td><textarea name="comment" cols="48" rows="4"><var $comment></textarea></td></tr>
+
+<if $image_inp>
+	<tr><td class="postblock"><const S_UPLOADFILE></td><td><input type="file" name="file" size="35" />
+	<if $textonly_inp>[<label><input type="checkbox" name="nofile" value="on" /><const S_NOFILE></label></if>
+	</td></tr>
+</if>
+
+<if ENABLE_CAPTCHA and !$admin>
+	<tr><td class="postblock"><const S_CAPTCHA></td><td><input type="text" name="captcha" size="10" />
+	<img alt="" src="<var expand_filename(CAPTCHA_SCRIPT)>?key=<if $oek_parent>res<var $oek_parent></if><if !$oek_parent>mainpage</if>&amp;dummy=<var $num>" />
+	</td></tr>
+</if>
+
+<input type="hidden" name="password" value="<var $password>" />
+</tbody></table></form></div>
+<script type="text/javascript">set_inputs("postform")</script>
+
+<hr />
+
+<div align="center">
+<img src="<var expand_filename($tmpname)>" />
+<var $decodedinfo>
+</div>
+
+<hr />
+
+}.NORMAL_FOOT_INCLUDE);
+
+use constant POST_EDIT_TEMPLATE => compile_template(MINI_HEAD_INCLUDE.q{ 
+<loop $loop>
+	<h1 style="text-align:center;font-size:1em">Now Editing Post No.<var $num></h1>
+	
+	<if $admin><div align="center"><em><const S_NOTAGS></em></div></if>
+	
+	<div class="postarea">
+	
+	<if !$admin>
+		<form action="<var expand_filename('paint.pl')>" method="get">
+		<hr />
+		<const S_OEKPAINT>
+		<select name="oek_painter">
+		
+		<loop S_OEKPAINTERS>
+			<if $painter eq OEKAKI_DEFAULT_PAINTER>
+			<option value="<var $painter>" selected="selected"><var $name></option>
+			</if>
+			<if $painter ne OEKAKI_DEFAULT_PAINTER>
+			<option value="<var $painter>"><var $name></option>
+			</if>
+		</loop>
+		</select>
+		<const S_OEKX><input type="text" name="oek_x" size="3" value="<var $width>" />
+		<const S_OEKY><input type="text" name="oek_y" size="3" value="<var $height>" />
+		<input type="hidden" name="oek_src" value="<var $image>" />
+		<input type="hidden" name="num" value="<var $num>" />
+		<input type="hidden" name="oek_parent" value="<var $parent>" />
+		<input type="submit" value="Oekaki Edit" name="oek_editing" />
+		<input type="hidden" name="password" value="<var $password>" />
+		<input type="hidden" name="num" value="<var $num>" />
+		<hr />
+		</form>
+	</if>
+	
+	<form id="postform" action="<var $self>" method="post" enctype="multipart/form-data">
+	
+	<input type="hidden" name="num" value="<var $num>" />
+	<input type="hidden" name="password" value="<var $password>" />
+	<input type="hidden" name="task" value="editpost" />
+	<if $admin><input type="hidden" name="admin" value="<var $admin>" />
+	<input type="hidden" name="no_captcha" value="1" />
+	<input type="hidden" name="no_format" value="1" /></if>
+	<if $parent><input type="hidden" name="parent" value="<var $parent>" /></if>
+	<if FORCED_ANON><input type="hidden" name="name" /></if>
+	<if SPAM_TRAP><div class="trap"><const S_SPAMTRAP><input type="text" name="name" size="28" /><input type="text" name="link" size="28" /></div></if>
+	
+	<table><tbody>
+	<if !FORCED_ANON><tr><td class="postblock"><const S_NAME></td><td><input type="text" name="field1" value="<var $name>" size="28" /><if $trip> # <var $trip><br />(Enter new tripcode above to change.)<br />[<label><input type="checkbox" value="1" name="killtrip" /> Remove Tripcode?</label>]</if></td></tr></if>
+	<tr><td class="postblock"><const S_EMAIL></td><td><input type="text" name="email" size="28" value="<var $email>" /></td></tr>
+	<tr><td class="postblock"><const S_SUBJECT></td><td><input type="text" name="subject" size="35" value="<var $subject>" />
+	<input type="submit" value="<const S_SUBMIT>" /></td></tr>
+	<tr><td class="postblock"><const S_COMMENT></td><td>
+	<textarea name="comment" cols="48" rows="4"><if $admin><var clean_string($comment)></if><if !$admin><var tag_killa($comment)></if></textarea></td></tr>
+	
+	<if ALLOW_IMAGE_REPLIES || !$parent>
+		<tr><td class="postblock"><const S_NEWFILE></td><td><input type="file" name="file" size="35" />
+		<br />(Keep this field blank to leave the file unchanged.)
+		</td></tr>
+	</if>
+	
+	<if ENABLE_CAPTCHA && !$admin>
+		<tr><td class="postblock"><const S_CAPTCHA></td><td><input type="text" name="captcha" size="10" />
+		<img alt="" src="<var expand_filename(CAPTCHA_SCRIPT)>?key=<var get_captcha_key($parent)>&amp;dummy=<var $num>" />
+		</td></tr>
+	</if>
+	</tbody></table></form></div>
+	<script type="text/javascript">set_inputs("postform")</script>
+</loop>
+}.MINI_FOOT_INCLUDE);
 
 1;
 
