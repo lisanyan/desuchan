@@ -1,3 +1,5 @@
+var thread_cookie = "9001_hidden_threads"; //You can change to custom name.
+
 function get_cookie(name)
 {
 	with(document.cookie)
@@ -8,6 +10,29 @@ function get_cookie(name)
 		else return '';
 	}
 };
+
+function passfield(num, type, script, page) // Bring up Password Field for [Edit] and [Delete] Links
+{
+	if (document.getElementById('delpostcontent'+num).innerHTML == "")
+	{
+		// Collapse other fields
+		var others=document.getElementsByName("deletepostspan");
+		for(var i=0; i<others.length; i++)
+		{
+			if(others[i].id != "delpostcontent"+num && others[i].innerHTML != "")
+			{
+				others[i].innerHTML="";
+			}
+		}
+		
+		document.getElementById('delpostcontent'+num).innerHTML = '[<label><input type="checkbox" name="fileonly" value="on" /> File Only?] <input type="password" name="password" id="password' + num + '" size="8" autocomplete="off" /> <input value="OK" type="submit" /><input type="hidden" name="task" value="delete" /><input type="hidden" name="delete" value="' + num + '" autocomplete="off"/>';
+		document.getElementById('password'+num).value = get_password("password");
+	}
+	else
+	{
+		document.getElementById('delpostcontent'+num).innerHTML = "";
+	}
+}
 
 function set_cookie(name,value,days)
 {
@@ -42,7 +67,8 @@ function get_password(name)
 
 function insert(text)
 {
-	var textarea=document.forms.postform.field4;
+	var textarea=document.forms.postform.comment;
+	text = text + "\n";
 	if(textarea)
 	{
 		if(textarea.createTextRange && textarea.caretPos) // IE
@@ -61,7 +87,7 @@ function insert(text)
 		{
 			textarea.value+=text+" ";
 		}
-		textarea.focus();
+		//textarea.focus();
 	}
 }
 
@@ -138,8 +164,9 @@ function get_preferred_stylesheet()
 	return null;
 }
 
-function set_inputs(id) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!field2.value) field2.value=get_cookie("email"); if(!password.value) password.value=get_password("password"); } }
-function set_delpass(id) { with(document.getElementById(id)) password.value=get_cookie("password"); }
+function set_inputs(id) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!email.value) email.value=get_cookie("email"); if(!password.value) password.value=get_password("password"); } }
+function set_delpass(id) { with(document.getElementById(id)) {password.value=get_cookie("password"); } }
+
 
 function do_ban(el)
 {
@@ -162,7 +189,7 @@ window.onload=function(e)
 	var match;
 
 	if(match=/#i([0-9]+)/.exec(document.location.toString()))
-	if(!document.forms.postform.field4.value)
+	if(!document.forms.postform.comment.value)
 	insert(">>"+match[1]);
 
 	if(match=/#([0-9]+)/.exec(document.location.toString()))
@@ -174,4 +201,84 @@ if(style_cookie)
 	var cookie=get_cookie(style_cookie);
 	var title=cookie?cookie:get_preferred_stylesheet();
 	set_stylesheet(title);
+}
+
+function threadHide(id)
+{
+	toggleHidden(id);
+	add_to_thread_cookie(id);
+}
+
+function threadShow(id)
+{
+	document.getElementById(id).style.display = "";
+	var threadInfo = id + "_info";
+	document.getElementById(threadInfo).innerHTML = "";
+	var hideThreadText = id + "_display";
+	document.getElementById(hideThreadText).innerHTML = "<a href=\"javascript:threadHide('"+ id +"')\">(&minus;) Hide Thread</a>";
+	remove_from_thread_cookie(id);
+}
+
+function add_to_thread_cookie(id)
+{
+	var hiddenThreadArray = get_cookie(thread_cookie);
+	if (hiddenThreadArray.indexOf(id + ",") != -1)
+	{			
+		return;
+	}
+	else
+	{
+		set_cookie(thread_cookie, hiddenThreadArray + id + ",", 365);
+	}
+}
+
+function remove_from_thread_cookie(id)
+{
+	var hiddenThreadArray = get_cookie(thread_cookie);
+	var myregexp = new RegExp(id + ",", 'g');
+	hiddenThreadArray = hiddenThreadArray.replace(myregexp, "");
+	set_cookie(thread_cookie, hiddenThreadArray, 365);
+}
+
+function toggleHidden(id)
+{
+	var id_split = id.split("");
+	if (id_split[0] == "t")
+	{
+		id_split.reverse();
+		var shortenedLength = id_split.length - 1;
+		id_split.length = shortenedLength;
+		id_split.reverse();
+	}
+	else
+	{
+		id = "t" + id; //Compatibility with an earlier mod
+	}
+	if (document.getElementById(id))
+	{
+		document.getElementById(id).style.display = "none";
+	}
+	var thread_name = id_split.join("");
+	var threadInfo = id + "_info";
+	if (document.getElementById(threadInfo))
+	{
+		document.getElementById(threadInfo).innerHTML = "<em>Thread " + thread_name + " Hidden.</em>"; 
+	}
+	var showThreadText = id + "_display";
+	if (document.getElementById(showThreadText)) 
+	{
+		document.getElementById(showThreadText).innerHTML = "<a href=\"javascript:threadShow('"+ id +"')\">(+) Show Thread</a>";
+	}
+}
+
+function popUp(URL) {
+	day = new Date();
+	id = day.getTime();
+	eval("page" + id + " = window.open(URL, '" + id + "', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=450,height=300');");
+}
+function popUpPost(URL) 
+{
+	day = new Date();
+	id = day.getTime();
+	eval("page" + id + " = window.open(URL, '" + id + "', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=600,height=350');");
 }

@@ -1,4 +1,4 @@
-# wakautils.pl v8.5
+# wakautils.pl v8.6
 
 use strict;
 
@@ -699,17 +699,18 @@ sub resolve_host($)
 # Data utilities
 #
 
-sub process_tripcode($;$$$)
+sub process_tripcode($;$$$$)
 {
-	my ($name,$tripkey,$secret,$charset)=@_;
+	my ($name,$tripkey,$secret,$charset,$nonamedecoding)=@_;
 	$tripkey="!" unless($tripkey);
 
 	if($name=~/^(.*?)((?<!&)#|\Q$tripkey\E)(.*)$/)
 	{
 		my ($namepart,$marker,$trippart)=($1,$2,$3);
 		my $trip;
-
-		$namepart=clean_string(decode_string($namepart,$charset));
+	
+		$namepart=decode_string($namepart,$charset) unless $nonamedecoding;
+		$namepart=clean_string($namepart);
 
 		if($secret and $trippart=~s/(?:\Q$marker\E)(?<!&#)(?:\Q$marker\E)*(.*)$//) # do we want secure trips, and is there one?
 		{
@@ -738,6 +739,7 @@ sub process_tripcode($;$$$)
 		return ($namepart,$trip);
 	}
 
+	return clean_string($name) if $nonamedecoding;
 	return (clean_string(decode_string($name,$charset)),"");
 }
 
@@ -970,6 +972,7 @@ sub read_array($)
 	else
 	{
 		open FILE,$file or return ();
+		binmode FILE;
 		my @array=map { s/\r?\n?$//; $_ } <FILE>;
 		close FILE;
 		return @array;
@@ -990,6 +993,7 @@ sub write_array($@)
 		my $rndname2="__".make_random_string(12).".dat";
 		if(open FILE,">$rndname1")
 		{
+			binmode FILE;
 			if(print FILE join "\n",@array)
 			{
 				close FILE;
@@ -1181,9 +1185,28 @@ sub make_thumbnail($$$$$;$)
 	$convert="convert" unless($convert);
 	`$convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality $magickname $thumbnail`;
 
-	return 1 unless($?);
+	return 1 unless($? || -s $thumbnail == 0);
+
+	unlink $thumbnail if (-e $thumbnail);
+
+	if ($filename=~/\.jpg$/)
+	{
+		`djpeg $magickname | $convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality - $thumbnail`; # Desuchan workaround...
+	}
+	else
+	{
+		`cjpeg -quality 90 $filename | $convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality - $thumbnail`;
+	}
+		
+	return 1 unless($? || -s $thumbnail == 0);
+
+	unlink $thumbnail if (-e $thumbnail);
 
 	# if that fails, try pnmtools instead
+
+	# disregard that, just exit (Desuchan fix)
+
+	return 0;
 
 	if($filename=~/\.jpg$/)
 	{
