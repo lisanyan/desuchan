@@ -1,0 +1,107 @@
+<!-- Desuchan Menu -->
+
+<style type="text/css">
+	div.page_header, div#futaba_style_header {margin-bottom:0.5em}
+	div.page_header {font-family: sans-serif; font-size:75%}
+	div#futaba_style_header {font-size:85%}
+	div.page_header a, div#futaba_style_header a {color: #34345C;text-decoration: none;}
+	div.page_header a:hover, div#futaba_style_header a:hover {color: #000000; background: #C6DAF0;}
+	div.page_header ul ul {display: none; background: #D6DAF0}
+	div.page_header ul {margin:0; padding:0; list-style:none}
+	div.page_header ul li {float:left; width:13em; text-align:left; background: #D6DAF0;}
+	div.page_header ul.show, div.page_header ul li:hover ul {display: block; position: absolute; width:13em; z-index:1000;}
+	div.page_header ul li {display: block; background: #D6DAF0}
+	div.page_header li a {display: block }
+	div.page_header ul li {font-weight: bold; text-align: left; padding-left:5px}
+	div.page_header ul li ul {border:1px solid #000000;margin-left:-5px;padding-right:5px}
+	div.page_header ul li ul li {font-weight: normal; text-align:left; position:relative;}
+	div.page_header ul li ul li:hover { background: #C6DAF0; }
+</style>
+
+<script type="text/javascript">
+	function show_list(item) { item.getElementsByTagName('ul')[0].className='show'; }
+	function hide_list(item) { item.getElementsByTagName('ul')[0].className='hide'; }
+	function show_futaba_style(booleanval)
+	{
+		if (booleanval)
+		{
+			document.getElementById('page_header').style.display = 'none';
+			document.getElementById('futaba_style_header').style.display = 'block';
+			set_cookie('show_futaba_style','yes',365);
+		}
+		else
+		{
+			document.getElementById('futaba_style_header').style.display = 'none';
+			document.getElementById('page_header').style.display = 'block';
+			set_cookie('show_futaba_style','no',365);
+		}
+	}
+</script>
+
+<div class="page_header" id="page_header" style="display:block">
+<ul>
+	<span style="display:inline;float:left;padding-right:3em;padding-left:3px;"><strong>Desuchan</strong></span>
+	<li onmouseover="show_list(this)" onmouseout="hide_list(this)">
+	<a href="http://www.desuchan.net/menu.php">The Maidens</a>
+		<ul>
+			<li><a href="/bananas/wakaba.html">/bananas/ - Kirakishou</a></li>
+			<li><a href="/boku/wakaba.html">/boku/ - Boku</a></li>
+			<li><a href="/dawa/wakaba.html">/dawa/ - Shinku</a></li>
+			<li><a href="/desu/wakaba.html">/desu/ - Desu</a></li>
+			<li><a href="/kashira/wakaba.html">/kashira/ - Kanada</a></li>
+			<li><a href="/otousama/wakaba.html">/otousama/ - Barasuishou</a></li>
+			<li><a href="/unyuu/wakaba.html">/unyuu/ - Nano</a></li>
+			<li><a href="/yakult/wakaba.html">/yakult/ - Alice</a></li>
+		</ul>
+	</li>
+	<li onmouseover="show_list(this)" onmouseout="hide_list(this)">
+	<a href="http://www.desuchan.net/menu.php">Rozen Maiden</a>
+		<ul>
+			<li><a href="/md/wakaba.html">/md/ - Manga/Doujinshi</a></li>
+			<li><a href="/ro/wakaba.html">/ro/ - Rozen Maiden</a></li>
+			<li><a href="/peach/wakaba.html">/peach/ - Peach-Pit</a></li>
+			<li><a href="/w/wakaba.html">/w/ - Wallpapers</a></li>
+		</ul>
+	</li>
+	<li onmouseover="show_list(this)" onmouseout="hide_list(this)">
+	<a href="http://www.desuchan.net/menu.php">Off-Topic</a>
+		<ul>
+			<li><a href="/a/wakaba.html">/a/ - Anime/Manga</a></li>
+			<li><a href="/do/wakaba.html">/do/ - Dolls</a></li>
+			<li><a href="/fi/wakaba.html">/fi/ - Figurines</a></li>
+			<li><a href="/gif/wakaba.html">/gif/ - Animation</a></li>
+			<li><a href="/h/wakaba.html">/h/ - Hentai</a></li>
+			<li><a href="/loli/wakaba.html">/loli/ - Lolicon</a></li>
+			<li><a href="/moonspeak/wakaba.html">/moonspeak/ - Moonspeak</a></li>
+			<li><a href="/o/wakaba.html">/o/ - Oekaki</a></li>
+			<li><a href="/ot/wakaba.html">/ot/ - Off-Topic</a></li>
+			<li><a href="/r/wakaba.html">/r/ - Request</a></li>
+			<li><a href="/rp/wakaba.html">/rp/ - Role-Play &amp; Fiction</a></li>
+			<li><a href="/tr/wakaba.html">/tr/ - Traps</a></li>
+			<li><a href="/v/wakaba.html">/v/ - Video Games</a></li>
+		</ul>
+	</li>
+	<li onmouseover="show_list(this)" onmouseout="hide_list(this)">
+	<a href="http://www.desuchan.net/menu.php">Text Boards</a>
+		<ul>
+			<li><a href="/mod/index.html">/mod/ - Mod Central</a></li>
+			<li><a href="/sugg/index.html">/sugg/ - Suggestions &amp; Help</a></li>
+		</ul>
+	</li>
+</ul>
+<script type="text/javascript">
+	document.write(' <a href="javascript:show_futaba_style(true)" style="float:right">Use Classic Menu</a>');
+	if (get_cookie('show_futaba_style') == 'yes') { document.getElementById('page_header').style.display = 'none'; }
+</script>
+<br />
+</div>
+<div id="futaba_style_header" style="display:none">
+	<p style="margin-top:0; margin-bottom:0"><span style="float:left">[ <a href="/bananas/wakaba.html" title="Kirakishou">bananas</a> / <a href="/boku/wakaba.html" title="Boku">boku</a> / <a href="/dawa/wakaba.html" title="Shinku">dawa</a> / <a href="/desu/wakaba.html" title="Desu">desu</a> / <a href="/kashira/wakaba.html" title="Kanada">kashira</a> / <a href="/otousama/wakaba.html" title="Barasuishou">otousama</a> / <a href="/unyuu/wakaba.html" title="Nano">unyuu</a> / <a href="/yakult/wakaba.html" title="Alice">yakult</a> ]</span> <span style="float:left">[ <a href="/md/wakaba.html" title="Manga/Doujinshi">md</a> / <a href="/ro/wakaba.html" title="Rozen Maiden">ro</a> / <a href="/peach/wakaba.html" title="Peach-Pit">peach</a> / <a href="/w/wakaba.html" title="Wallpapers">w</a> ]</span> <span style="float:left">[ <a href="/a/wakaba.html" title="Anime/Manga">a</a> / <a href="/do/wakaba.html" title="Dolls">do</a> / <a href="/fi/wakaba.html" title="Figurines">fi</a> / <a href="/gif/wakaba.html" title="Animation">gif</a> / <a href="/h/wakaba.html" title="Hentai">h</a> / <a href="/loli/wakaba.html" title="Lolicon">loli</a> / <a href="/moonspeak/wakaba.html" title="Translation">moonspeak</a> / <a href="/o/wakaba.html" title="Oekaki">o</a> / <a href="/ot/wakaba.html" title="Off-Topic">ot</a> / <a href="/r/wakaba.html" title="Request">r</a> / <a href="/rp/wakaba.html" title="Role-Play &amp; Fiction">rp</a> / <a href="/tr/wakaba.html" title="Traps">tr</a> / <a href="/v/wakaba.html" title="Video Games">v</a> ]</span> <span style="float:left">[ <a href="/sugg/index.html" title="Suggestions &amp; Help">sugg</a> ]</span></p>
+<script type="text/javascript">
+	document.write(' <a href="javascript:show_futaba_style(false)" style="float:right">Use New Menu</a>');
+	if (get_cookie('show_futaba_style') == 'yes') { document.getElementById('futaba_style_header').style.display = 'block'; }
+</script>
+<br />
+</div>
+<!-- End Menu-->
+<p style="float:right;margin-top:0;margin-bottom:0">[<a href="/">Home</a>] [<a href="admin.pl">Manage</a>]</p>

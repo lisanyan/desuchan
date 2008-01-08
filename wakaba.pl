@@ -2185,7 +2185,7 @@ sub do_rebuild_cache($)
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 	# END ADDED
 
-	unlink glob RES_DIR.'*'.PAGE_EXT;
+	unlink glob RES_DIR.'*';
 
 	repair_database();
 	build_thread_cache_all();

@@ -1,4 +1,4 @@
-var thread_cookie = "9001_hidden_threads"; //You can change to custom name.
+var thread_cookie = "o_hidden_threads"; //You can change to custom name.
 
 function get_cookie(name)
 {
@@ -10,29 +10,6 @@ function get_cookie(name)
 		else return '';
 	}
 };
-
-function passfield(num, type, script, page) // Bring up Password Field for [Edit] and [Delete] Links
-{
-	if (document.getElementById('delpostcontent'+num).innerHTML == "")
-	{
-		// Collapse other fields
-		var others=document.getElementsByName("deletepostspan");
-		for(var i=0; i<others.length; i++)
-		{
-			if(others[i].id != "delpostcontent"+num && others[i].innerHTML != "")
-			{
-				others[i].innerHTML="";
-			}
-		}
-		
-		document.getElementById('delpostcontent'+num).innerHTML = '[<label><input type="checkbox" name="fileonly" value="on" /> File Only?] <input type="password" name="password" id="password' + num + '" size="8" autocomplete="off" /> <input value="OK" type="submit" /><input type="hidden" name="task" value="delete" /><input type="hidden" name="delete" value="' + num + '" autocomplete="off"/>';
-		document.getElementById('password'+num).value = get_password("password");
-	}
-	else
-	{
-		document.getElementById('delpostcontent'+num).innerHTML = "";
-	}
-}
 
 function set_cookie(name,value,days)
 {
@@ -215,29 +192,56 @@ function threadShow(id)
 	var threadInfo = id + "_info";
 	document.getElementById(threadInfo).innerHTML = "";
 	var hideThreadText = id + "_display";
-	document.getElementById(hideThreadText).innerHTML = "<a href=\"javascript:threadHide('"+ id +"')\">(&minus;) Hide Thread</a>";
+	document.getElementById(hideThreadText).innerHTML = "<a href=\"javascript:threadHide('"+ id +"')\">(-) Hide Thread</a>";
 	remove_from_thread_cookie(id);
 }
 
 function add_to_thread_cookie(id)
 {
-	var hiddenThreadArray = get_cookie(thread_cookie);
-	if (hiddenThreadArray.indexOf(id + ",") != -1)
-	{			
-		return;
-	}
-	else
+	var hiddenThreadArray = extractFromThreadCookie();
+	var addThread = 1;
+	for (var i=0; i <= hiddenThreadArray.length; i++)
 	{
-		set_cookie(thread_cookie, hiddenThreadArray + id + ",", 365);
+		if (hiddenThreadArray[i] == id)
+		{
+			break;
+			addThread = 0;
+		}
+	}
+	if (addThread)
+	{
+		hiddenThreadArray.push(id);
+		set_cookie(thread_cookie, hiddenThreadArray.join(","), 365);
 	}
 }
 
 function remove_from_thread_cookie(id)
 {
-	var hiddenThreadArray = get_cookie(thread_cookie);
-	var myregexp = new RegExp(id + ",", 'g');
-	hiddenThreadArray = hiddenThreadArray.replace(myregexp, "");
-	set_cookie(thread_cookie, hiddenThreadArray, 365);
+	var hiddenThreadArray = extractFromThreadCookie();
+	var removeThread = 0;
+	for (var i=0; i < hiddenThreadArray.length; i++)
+	{
+		if (removeThread)
+		{
+			hiddenThreadArray[i-1] = hiddenThreadArray[i];
+		}
+		else if (hiddenThreadArray[i] == id || hiddenThreadArray == '' || "t" + hiddenThreadArray[i] == id)
+		{
+			removeThread = 1;
+		}
+	}
+	var shortenedLength = hiddenThreadArray.length - 1;
+	hiddenThreadArray.length = shortenedLength;
+	set_cookie(thread_cookie, hiddenThreadArray.join(","), 365);
+}
+
+function hideThreads()
+{
+	var hide_thread_array=extractFromThreadCookie();
+	for (var i = 0; i < hide_thread_array.length; i++)
+	{
+		toggleHidden(hide_thread_array[i]);
+	}
 }
 
 function toggleHidden(id)
@@ -271,6 +275,12 @@ function toggleHidden(id)
 	}
 }
 
+function extractFromThreadCookie()
+{
+	var hiddenThreads=get_cookie(thread_cookie);
+	return hiddenThreads.split(',');	
+}
+
 function popUp(URL) {
 	day = new Date();
 	id = day.getTime();
@@ -281,4 +291,26 @@ function popUpPost(URL)
 	day = new Date();
 	id = day.getTime();
 	eval("page" + id + " = window.open(URL, '" + id + "', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=600,height=350');");
+}
+function passfield(num, type, script, page) // Bring up Password Field for [Edit] and [Delete] Links
+{
+	if (document.getElementById('delpostcontent'+num).innerHTML == "")
+	{
+		// Collapse other fields
+		var others=document.getElementsByName("deletepostspan");
+		for(var i=0; i<others.length; i++)
+		{
+			if(others[i].id != "delpostcontent"+num && others[i].innerHTML != "")
+			{
+				others[i].innerHTML="";
+			}
+		}
+		
+		document.getElementById('delpostcontent'+num).innerHTML = '[<label><input type="checkbox" name="fileonly" value="on" /> File Only?] <input type="password" name="password" id="password' + num + '" size="8" autocomplete="off" /> <input value="OK" type="submit" /><input type="hidden" name="task" value="delete" /><input type="hidden" name="delete" value="' + num + '" autocomplete="off"/>';
+		document.getElementById('password'+num).value = get_password("password");
+	}
+	else
+	{
+		document.getElementById('delpostcontent'+num).innerHTML = "";
+	}
 }
