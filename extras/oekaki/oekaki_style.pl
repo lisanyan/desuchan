@@ -104,6 +104,10 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <hr />
 
+<script type="text/javascript">
+	var hiddenThreads=get_cookie(thread_cookie);
+</script>
+
 <form id="delform" action="<var $self>" method="post">
 
 <loop $threads>
@@ -112,7 +116,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<div id="t<var $num>_info" style="float:left">
 			</div>
 
-			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('<var $num>')">(-) Hide Thread</a><ins style="text-decoration:none"><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
+			<if !$thread>
+				<span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">(&minus;) Hide Thread</a></span>
+			</if>
 
 			<div id="t<var $num>">
 			<if $image>
@@ -171,6 +177,14 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				<if !$omitimages && !$locked><var sprintf S_ABBR,$omit></if>
 				<if !$omitimages && $locked><var sprintf S_ABBR_LOCK,$omit></if>
 				</span>
+			</if>
+			<if !$thread>
+				<script type="text/javascript">
+					if (hiddenThreads.indexOf('t<var $num>,') != -1)
+					{
+						toggleHidden('t<var $num>');	
+					}
+				</script>
 			</if>
 		</if>
 		<if $parent>

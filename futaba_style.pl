@@ -40,8 +40,7 @@ form .trap { display:none }
 <script type="text/javascript" src="<var expand_filename(JS_FILE)>"></script>
 </head>
 <if $thread><body class="replypage"></if>
-<if !$thread && $threads><body onload="hideThreads()"></if>
-<if !$thread && !$threads><body></if>
+<if !$thread><body></if>
 
 }.include("include/header.html").q{
 
@@ -202,13 +201,17 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <hr />
 
+<script type="text/javascript">
+	var hiddenThreads=get_cookie(thread_cookie);
+</script>
+
 <form id="delform" action="<var $self>" method="post">
 
 <loop $threads>
 	<loop $posts>
 		<if !$parent>
 			<div id="t<var $num>_info" style="float:left"></div>
-			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('<var $num>')">(-) Hide Thread</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
+			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">(&minus;) Hide Thread</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
 			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
@@ -265,6 +268,14 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				<if !$omitimages && !$locked><var sprintf S_ABBR,$omit></if>
 				<if !$omitimages && $locked><var sprintf S_ABBR_LOCK,$omit></if>
 				</span>
+			</if>
+			<if !$thread>
+				<script type="text/javascript">
+					if (hiddenThreads.indexOf('t<var $num>,') != -1)
+					{
+						toggleHidden('t<var $num>');	
+					}
+				</script>
 			</if>
 		</if>
 		<if $parent>
@@ -443,9 +454,11 @@ use constant ERROR_TEMPLATE_MINI => compile_template(MINI_HEAD_INCLUDE.q{
 }.MINI_FOOT_INCLUDE);
 
 use constant BAN_TEMPLATE => compile_template(q{
-<html>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-<link rel="stylesheet" type="text/css" href="http://www.desuchan.net/css/style.css"></head>
+<link rel="stylesheet" type="text/css" href="http://www.desuchan.net/css/style.css" />
 <style type="text/css">
 	p {margin-left:0.5em}
 </style>
@@ -454,7 +467,7 @@ use constant BAN_TEMPLATE => compile_template(q{
 <body>
 <div style="text-align: center;">
 	<h1>Desuchan</h1>
-	<h3>"back to the internet"</h3><br>
+	<h3>"back to the internet"</h3><br />
 </div>
 <div class="content">
 	<h2 style="text-align: center;"><const S_BADHOST></h2>
