@@ -518,12 +518,14 @@ sub print_page($$)
 		close PAGE;
 
 		rename $tmpname,$filename;
+		chmod 0644, $filename;
 	}
 	else
 	{
 		open (PAGE,">$filename") or make_error(S_NOTWRITE);
 		print PAGE $contents;
 		close PAGE;
+		chmod 0644, $filename;
 	}
 }
 
@@ -2185,7 +2187,7 @@ sub do_rebuild_cache($)
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 	# END ADDED
 
-	unlink glob RES_DIR.'*';
+	unlink glob RES_DIR.'*'.PAGE_EXT;
 
 	repair_database();
 	build_thread_cache_all();
