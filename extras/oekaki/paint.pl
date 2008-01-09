@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# use CGI::Carp qw(fatalsToBrowser);
+use CGI::Carp qw(fatalsToBrowser);
 
 use strict;
 
