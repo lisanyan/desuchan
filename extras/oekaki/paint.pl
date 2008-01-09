@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use CGI::Carp qw(fatalsToBrowser);
+# use CGI::Carp qw(fatalsToBrowser);
 
 use strict;
 
@@ -11,12 +11,10 @@ use lib '.';
 BEGIN { require "config.pl"; }
 BEGIN { require "config_defaults.pl"; }
 BEGIN { require "strings_en.pl"; }
-BEGIN { require "wakaba.pl"; } # ADDED
+# BEGIN { require "wakaba.pl"; } # ADDED
 BEGIN { require "oekaki_style.pl"; }
 BEGIN { require "oekaki_config.pl"; }
 BEGIN { require "oekaki_strings_en.pl"; }
-
-
 
 my $query=new CGI;
 
@@ -43,8 +41,8 @@ if ($oek_editing) # ADDED - check password
 	my $sth = $dbh->prepare("SELECT password FROM ".SQL_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
-	make_error_small(S_BADEDITPASS) if ($password ne $$row{password});
-	make_error_small(S_NOPASS) if ($password eq '');
+	make_error(S_BADEDITPASS) if ($password ne $$row{password});
+	make_error(S_NOPASS) if ($password eq '');
 	$sth->finish();
 }
 

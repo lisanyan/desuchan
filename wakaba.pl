@@ -1689,7 +1689,7 @@ sub process_file($$$$)
 		($md5)=$md5sum=~/^([0-9a-f]+)/ unless($?);
 	}
 
-	if($md5 && $parent) # if we managed to generate an md5 checksum, check for duplicate files in the same thread
+	if($md5 && $parent && (!defined(&DUPE_CHECK) || &DUPE_CHECK) ) # if we managed to generate an md5 checksum, check for duplicate files in the same thread
 	{
 		my $sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE md5=? AND (parent=? OR num=?);") or make_error(S_SQLFAIL);
 		$sth->execute($md5, $parent, $parent) or make_error(S_SQLFAIL);

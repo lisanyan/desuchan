@@ -275,10 +275,6 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 }.NORMAL_FOOT_INCLUDE);
 
-BEGIN { undef $SIG{'__WARN__'} } # re-enable warnings
-
-
-
 # terrible quirks mode code
 use constant OEKAKI_PAINT_TEMPLATE => compile_template(q{
 
@@ -500,6 +496,8 @@ use constant POST_EDIT_TEMPLATE => compile_template(MINI_HEAD_INCLUDE.q{
 	<script type="text/javascript">set_inputs("postform")</script>
 </loop>
 }.MINI_FOOT_INCLUDE);
+
+BEGIN { undef $SIG{'__WARN__'} } # re-enable warnings
 
 1;
 
