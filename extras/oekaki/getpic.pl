@@ -1,4 +1,4 @@
-#!perl
+#!/usr/bin/perl
 
 use CGI::Carp qw(fatalsToBrowser);
 
@@ -26,6 +26,8 @@ my $buffer;
 while(read(STDIN,$buffer,1024)) { print FILE $buffer; }
 
 close FILE;
+
+chmod 0644, $tmpname;
 
 print "Content-Type: text/plain\n";
 print "\n";

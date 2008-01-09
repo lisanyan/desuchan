@@ -11,7 +11,7 @@ use lib '.';
 BEGIN { require "config.pl"; }
 BEGIN { require "config_defaults.pl"; }
 BEGIN { require "strings_en.pl"; }
-# BEGIN { require "wakaba.pl"; } # ADDED
+BEGIN { require "wakaba.pl"; } # ADDED
 BEGIN { require "oekaki_style.pl"; }
 BEGIN { require "oekaki_config.pl"; }
 BEGIN { require "oekaki_strings_en.pl"; }
