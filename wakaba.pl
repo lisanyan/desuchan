@@ -20,7 +20,16 @@ use lib '.';
 BEGIN { require "config.pl"; }
 BEGIN { require "config_defaults.pl"; }
 BEGIN { require "strings_en.pl"; }		# edit this line to change the language
-BEGIN { require "futaba_style.pl"; }	# edit this line to change the board style
+BEGIN { 
+	if (defined(&OEKAKI_BOARD) && &OEKAKI_BOARD == 1)
+	{
+		require "oekaki_style.pl";
+	}
+	else
+	{
+		require "futaba_style.pl";
+	}
+}	
 BEGIN { require "captcha.pl"; }
 BEGIN { require "wakautils.pl"; }
 
@@ -1770,7 +1779,9 @@ sub process_file($$$$)
 		my $root=$1;
                 system(LOAD_SENDER_SCRIPT." $filename $root $md5 &");
         }
-
+	
+	chmod 0644, $filename;
+	chmod 0644, $thumbnail if defined($thumbnail);
 
 	return ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height);
 }
