@@ -1,5 +1,3 @@
-var thread_cookie = "9001_hidden_threads"; //You can change to custom name.
-
 function get_cookie(name)
 {
 	with(document.cookie)
@@ -11,27 +9,72 @@ function get_cookie(name)
 	}
 };
 
-function passfield(num, type, script, page) // Bring up Password Field for [Edit] and [Delete] Links
+function passfield(num) // Bring up Password Field for [Edit] and [Delete] Links
 {
-	if (document.getElementById('delpostcontent'+num).innerHTML == "")
+	if (!document.getElementById('password'+num)) // If the field isn't present...
 	{
 		// Collapse other fields
-		var others=document.getElementsByName("deletepostspan");
-		for(var i=0; i<others.length; i++)
-		{
-			if(others[i].id != "delpostcontent"+num && others[i].innerHTML != "")
-			{
-				others[i].innerHTML="";
-			}
-		}
+		if (lastopenfield) { collapse_field(lastopenfield); }
 		
-		document.getElementById('delpostcontent'+num).innerHTML = '[<label><input type="checkbox" name="fileonly" value="on" /> File Only?] <input type="password" name="password" id="password' + num + '" size="8" autocomplete="off" /> <input value="OK" type="submit" /><input type="hidden" name="task" value="delete" /><input type="hidden" name="delete" value="' + num + '" autocomplete="off"/>';
-		document.getElementById('password'+num).value = get_password("password");
+		// Assemble new field
+		var label = document.createElement("label");
+		var bracket_left = document.createTextNode("[");
+		var checkbox = document.createElement("input");
+		checkbox.setAttribute("type","checkbox");
+		checkbox.setAttribute("name","postfileonly");
+		checkbox.setAttribute("value","on");
+		var label_text = document.createTextNode(" File Only?] ");
+		label.appendChild(bracket_left);
+		label.appendChild(checkbox);
+		label.appendChild(label_text);
+		
+		var field = document.createElement("input");
+		field.setAttribute("type","password");
+		field.setAttribute("id","password"+num);
+		field.setAttribute("name","postpassword");
+		field.setAttribute("size","8");
+		field.setAttribute("autocomplete","off"); // So much for standards compliance. -_- I RESERVE THE RIGHT TO HAVE A WEEABOO SMILEY HERE AS A SYMBOL OF MY FRUSTRATION
+		field.setAttribute("value", get_password("password"));
+		
+		var spacer = document.createTextNode(" ");
+		
+		var submit = document.createElement("input");
+		submit.setAttribute("type","submit");
+		submit.setAttribute("value","OK");
+		submit.setAttribute("name","singledelete");
+		
+		var hiddenInfo = document.createElement("input");
+		hiddenInfo.setAttribute("type","hidden");
+		hiddenInfo.setAttribute("name","deletepost");
+		hiddenInfo.setAttribute("value",num);
+		
+		var selectedspan = document.getElementById('delpostcontent'+num);
+		selectedspan.appendChild(label);
+		selectedspan.appendChild(field);
+		selectedspan.appendChild(spacer);
+		selectedspan.appendChild(submit);
+		selectedspan.appendChild(hiddenInfo);	
+		
+		// This is now the current open delete field
+		lastopenfield = num;
 	}
 	else
 	{
-		document.getElementById('delpostcontent'+num).innerHTML = "";
+		collapse_field(num);
+		// No fields open now
+		lastopenfield = 0;
 	}
+}
+
+function collapse_field(num)
+{
+	var newspan = document.createElement("span");
+	var form = document.getElementById("deletelink"+num);
+	var selectedspan = document.getElementById('delpostcontent'+num);
+	form.replaceChild(newspan,selectedspan);
+	newspan.style.display = "inline";
+	selectedspan.setAttribute("id","");
+	newspan.setAttribute("id","delpostcontent"+num);
 }
 
 function set_cookie(name,value,days)
@@ -212,10 +255,32 @@ function threadHide(id)
 function threadShow(id)
 {
 	document.getElementById(id).style.display = "";
+	
 	var threadInfo = id + "_info";
-	document.getElementById(threadInfo).innerHTML = "";
-	var hideThreadText = id + "_display";
-	document.getElementById(hideThreadText).innerHTML = "<a href=\"javascript:threadHide('"+ id +"')\">(&minus;) Hide Thread</a>";
+	var parentform = document.getElementById("delform");
+	var obsoleteinfo = document.getElementById(threadInfo);
+	obsoleteinfo.setAttribute("id","");
+	var clearedinfo = document.createElement("div");
+	clearedinfo.style.cssFloat = "left";
+	clearedinfo.style.styleFloat = "left"; // Gee, thanks, IE.
+	parentform.replaceChild(clearedinfo,obsoleteinfo);
+	clearedinfo.setAttribute("id",threadInfo);
+	
+	var hideThreadSpan = document.createElement("span");
+	var hideThreadLink = document.createElement("a");
+	hideThreadLink.setAttribute("href","javascript:threadHide('"+id+"')");
+	var hideThreadLinkText = document.createTextNode("Hide Thread (\u2212)");
+	hideThreadLink.appendChild(hideThreadLinkText);
+	hideThreadSpan.appendChild(hideThreadLink);
+	
+	var oldSpan = document.getElementById(id+"_display");
+	oldSpan.setAttribute("id","");
+	parentform.replaceChild(hideThreadSpan,oldSpan);
+	hideThreadLink.setAttribute("id","toggle"+id);
+	hideThreadSpan.setAttribute("id",id+"_display");
+	hideThreadSpan.style.cssFloat = "right";
+	hideThreadSpan.style.styleFloat = "right";
+	
 	remove_from_thread_cookie(id);
 }
 
@@ -252,7 +317,7 @@ function toggleHidden(id)
 	}
 	else
 	{
-		id = "t" + id; //Compatibility with an earlier mod
+		id = "t" + id; // Compatibility with an earlier mod
 	}
 	if (document.getElementById(id))
 	{
@@ -262,12 +327,31 @@ function toggleHidden(id)
 	var threadInfo = id + "_info";
 	if (document.getElementById(threadInfo))
 	{
-		document.getElementById(threadInfo).innerHTML = "<em>Thread " + thread_name + " Hidden.</em>"; 
+		var hiddenNotice = document.createElement("em");
+		var hiddenNoticeText = document.createTextNode("Thread " + thread_name + " hidden.");
+		hiddenNotice.appendChild(hiddenNoticeText);
+		
+		var hiddenNoticeDivision = document.getElementById(threadInfo);
+		hiddenNoticeDivision.appendChild(hiddenNotice);
 	}
 	var showThreadText = id + "_display";
 	if (document.getElementById(showThreadText)) 
 	{
-		document.getElementById(showThreadText).innerHTML = "<a href=\"javascript:threadShow('"+ id +"')\">(+) Show Thread</a>";
+		var showThreadSpan = document.createElement("span");
+		var showThreadLink = document.createElement("a");
+		showThreadLink.setAttribute("href","javascript:threadShow('"+id+"')");
+		var showThreadLinkText = document.createTextNode("Show Thread (+)");
+		showThreadLink.appendChild(showThreadLinkText);
+		showThreadSpan.appendChild(showThreadLink);
+		
+		var parentform = document.getElementById("delform");
+		var oldSpan = document.getElementById(id+"_display");
+		oldSpan.setAttribute("id","");
+		parentform.replaceChild(showThreadSpan,oldSpan);
+		showThreadLink.setAttribute("id","toggle"+id);
+		showThreadSpan.setAttribute("id",id+"_display");
+		showThreadSpan.style.cssFloat = "right";
+		showThreadSpan.style.styleFloat = "right";
 	}
 }
 

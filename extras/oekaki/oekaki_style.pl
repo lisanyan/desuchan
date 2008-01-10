@@ -117,7 +117,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			</div>
 
 			<if !$thread>
-				<span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">(&minus;) Hide Thread</a></span>
+				<span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">Hide Thread (&minus;)</a></span>
 			</if>
 
 			<div id="t<var $num>">
@@ -155,9 +155,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$thread><a href="<var get_reply_link($num,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
-			<span class="deletelink">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
-				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			<span class="deletelink" id="deletelink<var $num>">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
+				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
 			<if !$thread>
@@ -201,9 +201,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$thread><a href="<var get_reply_link($parent,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
-			<span class="deletelink">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
-				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			<span class="deletelink" id="deletelink<var $num>">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
+				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
 

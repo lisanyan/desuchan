@@ -134,12 +134,12 @@ elsif($task eq "post")
 }
 elsif($task eq "delete")
 {
-	my $password = $query->param("password");
+	my $password = ($query->param("singledelete")) ? $query->param("postpassword") : $query->param("password");
 	my $fileonly = $query->param("fileonly");
 	my $archive=$query->param("archive");
-	my $fromwindow = $query->param("fromwindow"); # Is it from a window/widget? 
+	my $fromwindow = $query->param("fromwindow"); # Is it from a window or a collapsable field?
 	my $admin=$query->param("admin");
-	my @posts=$query->param("delete");
+	my @posts = ($query->param("singledelete")) ? $query->param("deletepost") : $query->param("delete");
 
 	delete_stuff($password,$fileonly,$archive,$admin,$fromwindow,@posts);
 }

@@ -36,7 +36,7 @@ form .trap { display:none }
 <link rel="<if !$default>alternate </if>stylesheet" type="text/css" href="<var $path><var $filename>" title="<var $title>" />
 </loop>
 
-<script type="text/javascript">var style_cookie="<const STYLE_COOKIE>";</script>
+<script type="text/javascript">var style_cookie="<const STYLE_COOKIE>"; var thread_cookie = "<const SQL_TABLE>_hidden_threads"; var lastopenfield = 0;</script>
 <script type="text/javascript" src="<var expand_filename(JS_FILE)>"></script>
 </head>
 <if $thread><body class="replypage"></if>
@@ -211,7 +211,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 	<loop $posts>
 		<if !$parent>
 			<div id="t<var $num>_info" style="float:left"></div>
-			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">(&minus;) Hide Thread</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
+			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">Hide Thread (&minus;)</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
 			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
@@ -245,9 +245,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$thread><a href="<var get_reply_link($num,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
-			<span class="deletelink">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
-				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			<span class="deletelink" id="deletelink<var $num>">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
+				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
 			<if !$thread>
@@ -292,9 +292,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$thread><a href="<var get_reply_link($parent,0)>#i<var $num>">No.<var $num></a></if>
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
-			<span class="deletelink">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="newWindow" onclick="passfield('<var $num>', 'delete', '<var $self>', null); return false">Delete</a>]
-				<form action="<var $self>" method="post" id="deletepostform<var $num>" style="display:inline"><span id="delpostcontent<var $num>" style="display:inline" name="deletepostspan"></span></form>
+			<span class="deletelink" id="deletelink<var $num>">
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
+				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
 
