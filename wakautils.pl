@@ -1,4 +1,4 @@
-# wakautils.pl v8.6
+# wakautils.pl v8.7
 
 use strict;
 
@@ -20,7 +20,7 @@ use constant MAX_UNICODE => 1114111;
 # HTML utilities
 #
 
-my $protocol_re=qr{(?:http://|https://|ftp://|mailto:|news:|irc:)};
+my $protocol_re=qr{(?:http://|https://|ftp://|mailto:|news:|irc:|aim:|AIM:)};
 my $url_re=qr{(${protocol_re}[^\s<>()"]*?(?:\([^\s<>()"]*?\)[^\s<>()"]*?)*)((?:\s|<|>|"|\.||\]|!|\?|,|&#44;|&quot;)*(?:[\s<>()"]|$))};
 
 sub protocol_regexp() { return $protocol_re }
@@ -955,6 +955,22 @@ sub hide_data($$$$;$)
 	return $crypt;
 }
 
+sub hide_critical_data($$)
+{
+	my ($string,$key) = @_;
+	setup_rc6($key);
+	# return pack 'u', encrypt_rc6($string);
+	my $crypt;
+	my $i=0;
+	while($i + 1 <= length $string)
+	{
+		$crypt .= encode_base64(encrypt_rc6(substr $string,$i,(($i+15 < length $string) ? 15 : (length $string)-$i)));
+		chop $crypt;
+		$i += 15;
+	}
+	return $crypt;
+}
+
 
 
 #
@@ -1349,7 +1365,7 @@ sub setup_rc6($)
 
 sub encrypt_rc6($)
 {
-	my ($block,)=@_;
+	my ($block)=@_;
 	my ($A,$B,$C,$D)=unpack "V4",$block."\0"x16;
 
 	$B=add($B,$S[0]);
@@ -1373,7 +1389,7 @@ sub encrypt_rc6($)
 
 sub decrypt_rc6($)
 {
-	my ($block,)=@_;
+	my ($block)=@_;
 	my ($A,$B,$C,$D)=unpack "V4",$block."\0"x16;
 
 	$C=add($C,-$S[43]);
@@ -1389,8 +1405,8 @@ sub decrypt_rc6($)
 
 	}
 
-	$D=add32($D,-$S[1]);
-	$B=add32($B,-$S[0]);
+	$D=add($D,-$S[1]);
+	$B=add($B,-$S[0]);
 		
 	return pack "V4",$A,$B,$C,$D;
 }
@@ -1411,5 +1427,18 @@ sub add(@) { my ($sum,$term); while(defined ($term=shift)) { $sum+=$term } retur
 sub rol($$) { my ($x,$n); ( $x = shift ) << ( $n = 31 & shift ) | 2**$n - 1 & $x >> 32 - $n; }
 sub ror($$) { rol(shift,32-(31&shift)); } # rorororor
 sub mul($$) { my ($a,$b)=@_; return ( (($a>>16)*($b&65535)+($b>>16)*($a&65535))*65536+($a&65535)*($b&65535) )%4294967296 }
+
+#
+# Time Utilities
+#
+
+sub epoch_to_human($) {
+	my @months = ("January","February","March","April","May","June","July","August","September","October","November","December");
+	my ($sec, $min, $hour, $day,$month,$year) = (gmtime($_[0]))[0,1,2,3,4,5,6]; 
+	$min = (length ($min) < 2) ? '0'.$min : $min;
+	$sec = (length ($sec) < 2) ? '0'.$sec : $sec;
+	$hour = (length ($hour) < 2) ? '0'.$hour : $hour;
+	$months[$month]." ".$day.", ".($year+1900)." at ".$hour.":".$min.":".$sec." UTC";
+}
 
 1;

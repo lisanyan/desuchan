@@ -72,7 +72,7 @@ use constant S_MPTABLE => '<th>Post No.</th><th>Time</th><th>Subject</th>'.
                           '<th>Name</th><th>Comment</th><th>Options</th><th>IP</th>';	# Explains names for Management Panel
 use constant S_IMGSPACEUSAGE => '[ Space used: %d KB ]';				# Prints space used KB by the board under Management Panel
 
-use constant S_BANTABLE => '<th>Type</th><th>Value</th><th>Comment</th><th>Expires</th><th>Can Browse</th><th>Action</th>'; # EDITED Explains names for Ban Panel
+use constant S_BANTABLE => '<th>Type</th><th>Value</th><th>Comment</th><th>Expires</th><th>Can Browse</th><th>Creator</th><th>Action</th>'; # EDITED Explains names for Ban Panel
 use constant S_BANIPLABEL => 'IP';
 use constant S_BANMASKLABEL => 'Mask';
 use constant S_BANCOMMENTLABEL => 'Comment';
@@ -128,7 +128,7 @@ use constant S_DUPE => 'Error: This file has already been posted <a href="%s">he
 use constant S_DUPENAME => 'Error: A file with the same name already exists.';	# Returns error when an filename already exists.
 use constant S_NOTHREADERR => 'Error: Thread does not exist.';				# Returns error when a non-existant thread is accessed
 use constant S_BADDELPASS => 'Error: Incorrect password for deletion.';		# Returns error for wrong password (when user tries to delete file)
-use constant S_WRONGPASS => 'Error: Management password incorrect.';		# Returns error for wrong password (when trying to access Manager modes)
+use constant S_WRONGPASS => 'Error: Management password incorrect, or login timed out.';		# Returns error for wrong password (when trying to access Manager modes)
 use constant S_VIRUS => 'Error: Possible virus-infected file.';				# Returns error for malformed files suspected of being virus-infected.
 use constant S_NOTWRITE => 'Error: Could not write to directory.';				# Returns error when the script cannot write to the directory, the chmod (777) is wrong
 use constant S_SPAM => 'Spammers are not welcome here.';					# Returns error when detecting spam

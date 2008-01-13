@@ -123,6 +123,9 @@ BEGIN {
 	eval "use constant FILETYPES => ()" unless(defined &FILETYPES);
 
 	eval "use constant WAKABA_VERSION => '3.0.7'" unless(defined &WAKABA_VERSION);
+	eval "use constant SQL_ACCOUNT_TABLE => 'staff_accounts'" unless(defined &SQL_ACCOUNT_TABLE);
+	eval "use constant SQL_STAFFLOG_TABLE => 'staff_activity'" unless(defined &SQL_STAFFLOG_TABLE);
+	eval "use constant SQL_COMMON_SITE_TABLE => 'board_index'" unless(defined &SQL_COMMON_SITE_TABLE);
 }
 
 1;

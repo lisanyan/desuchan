@@ -95,15 +95,6 @@ form .trap { display:none }
 <body>
 };
 
-use constant NORMAL_FOOT_INCLUDE => include("include/footer.html").q{
-
-</body></html>
-};
-
-use constant MINI_FOOT_INCLUDE => q{
-</body></html>
-};
-
 use constant MINI_HEAD_REFRESH_INCLUDE => q{
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -139,7 +130,6 @@ form .trap { display:none }
 };
 
 use constant NORMAL_FOOT_INCLUDE => include("include/footer.html").q{
-
 </body></html>
 };
 
@@ -201,9 +191,11 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <hr />
 
-<script type="text/javascript">
-	var hiddenThreads=get_cookie(thread_cookie);
-</script>
+<if !$thread>
+	<script type="text/javascript">
+		var hiddenThreads=get_cookie(thread_cookie);
+	</script>
+</if>
 
 <form id="delform" action="<var $self>" method="post">
 
@@ -211,7 +203,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 	<loop $posts>
 		<if !$parent>
 			<div id="t<var $num>_info" style="float:left"></div>
-			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')">Hide Thread (&minus;)</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
+			<if !$thread><span id="t<var $num>_display" style="float:right"><a href="javascript:threadHide('t<var $num>')" id="togglet<var $num>">Hide Thread (&minus;)</a><ins><noscript><br/>(Javascript Required.)</noscript></ins></span></if>
 			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
@@ -219,8 +211,9 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
 				<if $thumbnail>
-					<a target="_blank" href="<var expand_image_filename($image)>">
-					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" /></a>
+					<script type="text/javascript">var expand<var $num> = 0; </script>
+					<a target="_blank" href="<var expand_image_filename($image)>" <if $width>onclick="var imgexpand=document.getElementById('img<var get_filename($image)>'); if (expand<var $num> == 0) {imgexpand.src='<var expand_image_filename($image)>';imgexpand.width='<var $width>';imgexpand.height='<var $height>'; expand<var $num>=1; } else { imgexpand.src='<var expand_filename($thumbnail)>'; imgexpand.height='<var $tn_height>'; imgexpand.width='<var $tn_width>'; expand<var $num>=0} return false"</if>>
+					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
 				</if>
 				<if !$thumbnail>
 					<if DELETED_THUMBNAIL>
@@ -249,7 +242,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
 				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
-			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
+			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
 			<if !$thread>
 			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a>]</if>
 			<if $locked eq 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_VIEW></a>]</if>
@@ -296,7 +289,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>'); return false">Delete</a>]
 				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
-			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="newWindow" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
+			[<a href="<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
 
 			<if $image>
 				<br />
@@ -306,7 +299,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 				<if $thumbnail>
 					<a target="_blank" href="<var expand_image_filename($image)>">
-					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" /></a>
+					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
 				</if>
 				<if !$thumbnail>
 					<if DELETED_THUMBNAIL>
@@ -436,7 +429,6 @@ use constant POST_EDIT_TEMPLATE => compile_template (MINI_HEAD_INCLUDE.q{
 </loop>
 }.MINI_FOOT_INCLUDE);
 
-
 use constant ERROR_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 <h1 style="text-align: center"><var $error><br /><br />
@@ -482,23 +474,6 @@ use constant BAN_TEMPLATE => compile_template(q{
 </html>
 });
 
-use constant BAN_TEMPLATE_ADMIN => compile_template(MINI_HEAD_INCLUDE.include("include/header.html").q{
-<div class="adminbar">
-<loop $stylesheets>
-	[<a href="javascript:set_stylesheet('<var $title>')"><var $title></a>]
-</loop>
--
-[<a href="<var expand_filename(HOME)>" target="_top"><const S_HOME></a>]
-[<a href="<var get_secure_script_name()>?task=admin"><const S_ADMIN></a>]
-</div>
-<br/><br/>
-<h1 style="text-align: center; color: red"><const S_BADHOST_ADMIN></h1><form action="<var $self>" method="post">
-<input type="hidden" name="task" value="adminunban" />
-<input type="hidden" name="admin" value="<var $admin>" />
-<p style="text-align: center"><const S_ADMINOVERRIDE> <input type="password" name="nuke" /> <input type="submit" name="submit" value="<const S_SUBMIT>" /></p></form>
-
-}.MINI_FOOT_INCLUDE);
-
 #
 # Admin pages
 #
@@ -507,25 +482,64 @@ use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 
 [<a href="<var expand_filename(HTML_SELF)>"><const S_MANARET></a>]
 <if $admin>
-	[<a href="<var $self>?task=mpanel&amp;admin=<var $admin>"><const S_MANAPANEL></a>]
-	[<a href="<var $self>?task=bans&amp;admin=<var $admin>"><const S_MANABANS></a>]
-	[<a href="<var $self>?task=proxy&amp;admin=<var $admin>"><const S_MANAPROXY></a>]
-	[<a href="<var $self>?task=spam&amp;admin=<var $admin>"><const S_MANASPAM></a>]
-	[<a href="<var $self>?task=sqldump&amp;admin=<var $admin>"><const S_MANASQLDUMP></a>]
-	[<a href="<var $self>?task=sql&amp;admin=<var $admin>"><const S_MANASQLINT></a>]
-	[<a href="<var $self>?task=mpost&amp;admin=<var $admin>"><const S_MANAPOST></a>]
-	[<a href="<var $self>?task=rebuild&amp;admin=<var $admin>"><const S_MANAREBUILD></a>]
-	[<a href="<var $self>?task=logout"><const S_MANALOGOUT></a>]
+	[<a href="<var $self>?task=mpanel"><const S_MANAPANEL></a>]
+	[<a href="<var $self>?task=bans"><const S_MANABANS></a>]
+	[<a href="<var $self>?task=proxy"><const S_MANAPROXY></a>]
+	<if $type eq 'admin'>
+		[<a href="<var $self>?task=spam"><const S_MANASPAM></a>]
+		[<a href="<var $self>?task=sqldump"><const S_MANASQLDUMP></a>]
+		[<a href="<var $self>?task=sql"><const S_MANASQLINT></a>]
+	</if>
+	[<a href="<var $self>?task=mpost"><const S_MANAPOST></a>]
+	[<a href="<var $self>?task=rebuild"><const S_MANAREBUILD></a>]
+	<if $type eq 'admin'>
+		[<a href="<var $self>?task=staff">Staff Management</a>]
+		[<a href="<var $self>?task=stafflog">Staff Activity</a>]
+	</if>
 </if>
-<div class="passvalid"><const S_MANAMODE></div><br />
+<div class="passvalid" style="clear:both"><const S_MANAMODE></div>
+<if $admin><div style="margin-top:0;float:left">&rarr; Logged in as <span class="postername"><var $username></span> (<if $type eq 'admin'>Administrator</if><if $type eq 'mod'>Moderator</if><if $type eq 'globmod'>Global Moderator</if>). [<a href="<var $self>?task=edituserwindow&amp;username=<var $username>&amp;admin=<var $admin>">Options</a>] [<a href="<var $self>?task=logout"><const S_MANALOGOUT></a>]</div></if>
+<br />
 };
+
+use constant FIRST_TIME_SETUP => compile_template(NORMAL_HEAD_INCLUDE.q{
+<div align="center">
+<h2>First Time Setup</h2>
+<form action="<var $self>" method="post">
+<input type="hidden" name="task" value="entersetup" />
+<p>Staff accounts have not yet been set up.</p>
+<const S_ADMINPASS> 
+<input type="password" name="berra" size="8" value="" /> 
+<input type="submit" value="<const S_MANASUB>" />
+</form></div>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant ACCOUNT_SETUP => compile_template(NORMAL_HEAD_INCLUDE.q{
+<div align="center">
+<h2>First Time Setup</h2>
+<form action="<var $self>" method="post">
+<p>Administrator, please enter your desired login username and password.</p>
+<input type="hidden" name="admin" value="<var $admin>" />
+<input type="hidden" name="task" value="setup" />
+Username:
+<input type="text" name="username" size="8" value="" />
+<br />
+Password:
+<input type="password" name="password" size="8" value="" />
+<br />
+<input type="submit" value="<const S_MANASUB>" />
+</form></div>
+}.NORMAL_FOOT_INCLUDE);
 
 use constant ADMIN_LOGIN_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 <div align="center"><form action="<var $self>" method="post">
 <input type="hidden" name="task" value="admin" />
-<const S_ADMINPASS>
-<input type="password" name="berra" size="8" value="" />
+Username:
+<input type="text" name="desu" size="16" value="" />
+<br />
+Password:
+<input type="password" name="berra" size="16" value="" />
 <br />
 <label><input type="checkbox" name="savelogin" /> <const S_MANASAVE></label>
 <br />
@@ -542,6 +556,7 @@ use constant ADMIN_LOGIN_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <option value="nuke"><const S_MANANUKE></option>
 </select>
 <input type="submit" value="<const S_MANASUB>" />
+<p><em>Cookies required for login.</em></p>
 </form></div>
 
 }.NORMAL_FOOT_INCLUDE);
@@ -549,11 +564,11 @@ use constant ADMIN_LOGIN_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
-<div class="dellist"><const S_MANAPANEL></div>
+<div class="dellist"><h2><const S_MANAPANEL></h2></div>
 
 <form action="<var $self>" method="post">
 <input type="hidden" name="task" value="delete" />
-<input type="hidden" name="admin" value="<var $admin>" />
+<input type="hidden" name="admin" value="<var $admin>" /> <!-- Will be removed shortly -->
 
 <div class="delbuttons">
 <input type="submit" value="<const S_MPDELETE>" />
@@ -563,10 +578,10 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 </div>
 
 <table align="center" style="white-space: nowrap"><tbody>
-<tr class="managehead"><const S_MPTABLE></tr>
+<tr class="managehead"><const S_MPTABLE><if $type eq 'admin'><th>Staff</th></if></tr>
 
 <loop $posts>
-	<if !$parent><tr class="managehead"><th colspan="7"></th></tr></if>
+	<if !$parent><tr class="managehead"><if $type ne 'admin'><th colspan="7"></if><if $type eq 'admin'><th colspan="8"></if></th></tr></if>
 
 	<tr class="row<var $rowtype>">
 
@@ -585,30 +600,32 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<if $stickied><img src="<var expand_filename('include/sticky.gif')>" alt="<const S_STICKIEDALT>" title="<const S_STICKIED>" /> </if>
 	<if $locked eq 'yes'><img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
 	<if $stickied || $locked eq 'yes'><br /></if>
-	<if !$stickied>[<a href="<var $self>?admin=<var $admin>&amp;task=sticky&amp;thread=<var $num>"><const S_STICKYOPTION></a>] </if>
-	<if $stickied>[<a href="<var $self>?admin=<var $admin>&amp;task=unsticky&amp;thread=<var $num>"><const S_UNSTICKYOPTION></a>] </if>
-	<if $locked ne 'yes'>[<a href="<var $self>?admin=<var $admin>&amp;task=lock&amp;thread=<var $num>"><const S_LOCKOPTION></a>] <br /></if>
-	<if $locked eq 'yes'>[<a href="<var $self>?admin=<var $admin>&amp;task=unlock&amp;thread=<var $num>"><const S_UNLOCKOPTION></a>] <br /></if>
+	<if !$stickied>[<a href="<var $self>?task=sticky&amp;thread=<var $num>"><const S_STICKYOPTION></a>] </if>
+	<if $stickied>[<a href="<var $self>?task=unsticky&amp;thread=<var $num>"><const S_UNSTICKYOPTION></a>] </if>
+	<if $locked ne 'yes'>[<a href="<var $self>?task=lock&amp;thread=<var $num>"><const S_LOCKOPTION></a>] <br /></if>
+	<if $locked eq 'yes'>[<a href="<var $self>?task=unlock&amp;thread=<var $num>"><const S_UNLOCKOPTION></a>] <br /></if>
 	</if>
-	[<a href="<var $self>?task=editpostwindow&amp;admin=<var $admin>&amp;num=<var $num>" target="newWindow" onclick="popUpPost('<var $self>?task=editpostwindow&amp;admin=<var $admin>&amp;num=<var $num>'); return false">Edit</a>]
+	[<a href="<var $self>?task=editpostwindow&amp;num=<var $num>" target="_blank" onclick="popUpPost('<var $self>?task=editpostwindow&amp;admin=<var $admin>&amp;num=<var $num>'); return false">Edit</a>]
 	</td>
 	<td><var dec_to_dot($ip)>
-		[<a href="<var $self>?admin=<var $admin>&amp;task=deleteall&amp;ip=<var $ip>"><const S_MPDELETEALL></a>]
-		[<a href="<var $self>?admin=<var $admin>&amp;task=bans&amp;ip=<var $ip>"><const S_MPBAN></a>]
+		[<a href="<var $self>?task=deleteall&amp;ip=<var $ip>"><const S_MPDELETEALL></a>]
+		[<a href="<var $self>?task=bans&amp;ip=<var $ip>"><const S_MPBAN></a>]
 	</td>
+	<if $type eq 'admin'><td><var $username></td></if>
 	</tr>
-		<if $lastedit>
+	<if $lastedit>
 		<tr class="row<var $rowtype>">
 		<td colspan="5"><small>Edited: <var $lastedit></small></td>
 		<td><small><var dec_to_dot($lastedit_ip)>
-		[<a href="<var $self>?admin=<var $admin>&amp;task=deleteall&amp;ip=<var $lastedit_ip>"><const S_MPDELETEALL></a>]
-		[<a href="<var $self>?admin=<var $admin>&amp;task=bans&amp;ip=<var $lastedit_ip>"><const S_MPBAN></a>]
+		[<a href="<var $self>?task=deleteall&amp;ip=<var $lastedit_ip>"><const S_MPDELETEALL></a>]
+		[<a href="<var $self>?task=bans&amp;ip=<var $lastedit_ip>"><const S_MPBAN></a>]
 		</small></td>
+		<if $type eq "admin"><td><if $admin_post eq 'yes'>[<a href="<var $self>?task=staffedits&amp;num=<var $num>" target="_blank" onclick="popUp('<var $self>?task=staffedits&amp;num=<var $num>');return false">Staff Editing History</a>]</if></td></if>
 		</tr>
 	</if>
 	<if $image>
 		<tr class="row<var $rowtype>">
-		<td colspan="6"><small>
+		<if $type ne "admin"><td colspan="6"></if><if $type eq "admin"><td colspan="7"></if><small>
 		<const S_PICNAME><a href="<var expand_filename(clean_path($image))>"><var clean_string($image)></a>
 		(<var $size> B, <var $width>x<var $height>)&nbsp; MD5: <var $md5>
 		</small></td></tr>
@@ -643,14 +660,379 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 }.NORMAL_FOOT_INCLUDE);
 
+use constant STAFF_MANAGEMENT => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Management</h2></div>
+	
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th>User</th>
+			<th>Class</th>
+			<th width="30%">Boards Moderated</th>
+			<th>Latest Activity</th>
+			<th>Options</th>
+		</tr>
+	<loop $users>
+		<tr class="row<var $rowtype>">
+			<td><strong><var $username></strong></td>
+			<td><if $account eq 'admin'>Administrator</if>
+			<if $account eq 'mod'>Moderator</if>
+			<if $account eq 'globmod'>Global Moderator</if></td>
+			<td><if $account ne 'mod'><em>All</em></if><if $account eq 'mod'><var $reign></if></td>
+			<td><if $action><var get_action_name($action)> on <var $actiondate> [<a href="<var $self>?task=stafflog&amp;view=user&amp;usertoview=<var $username>">View All</a>]</if><if !$action><em>None</em></if></td>
+			<td>[<a href="<var $self>?task=edituserwindow&amp;username=<var $username>">Edit</a>] [<if $disabled><a href="">Enable</a></if><if !$disabled><a href="<var $self>?task=disableuserwindow&amp;username=<var $username>&amp;admin=<var $admin>">Disable</a></if>] [<a href="<var $self>?task=deleteuserwindow&amp;username=<var $username>&amp;admin=<var $admin>">Remove</a>]</td>
+		</tr>
+	</loop>
+	</tbody>
+	</table>
+	
+	<br />
+	
+	<div class="dellist"><h3>Create User</h3></div>
+	
+	<form action="<var $self>" method="post">
+	<input type="hidden" name="task" value="createuser" />
+	<input type="hidden" name="admin" value="<var $admin>" />
+	<p align="center"><em>The management password is necessary only for creating administrator accounts.<br />Global moderators oversee all boards.</em></p>
+	<table align="center">
+	<tbody>
+		<tr><td class="postblock">Username</td><td><input type="text" name="usernametocreate" size="16" value="" /><br /><em>Usernames must be 4-30 characters, A-Za-z0-9^._, and spaces</em></td></tr>
+		<tr><td class="postblock">Password</td><td><input type="password" name="passwordtocreate" size="16" value="" autocomplete="off" /><br /><em>Passwords must be 8-30 characters, A-Za-z0-9^._</em></td></tr>
+		<tr><td class="postblock">Account Type</td><td><select name="account" onchange="if (this.form.account.value=='mod'){document.getElementById('boardselect').style.display='';} else {document.getElementById('boardselect').style.display='none';} if (this.form.account.value=='admin') {document.getElementById('managepass').style.display='';} else {document.getElementById('managepass').style.display='none';}"><option value="mod">Moderator</option><option value="globmod" selected="selected">Global Moderator</option><option value="admin">Administrator</option></select> <input type="submit" value="Create User" /></td></tr>
+		<tr id="boardselect"><td class="postblock">Controlled Boards</td>
+			<td><loop $boards><label><input type="checkbox" name="reign" value="<var $board>" /> <var $board></label><br /></loop></td></tr>
+		<tr id="managepass"><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" autocomplete="off" /></td></tr>
+	</tbody>
+	</table>
+	</form>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_DELETE_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>User Deletion Confirmation</h2></div>
+	<p align="center">Are you sure you want to delete user <strong><var $user_to_delete></strong>?</p>
+	<form id="confirm" action="<var $self>" method="post">
+		<input type="hidden" name="admin" value="<var $admin>" />
+		<input type="hidden" name="task" value="deleteuser" />
+		<input type="hidden" name="username" value="<var $user_to_delete>" />
+		<if $account eq "admin"><p align="center">Manager password required. <input type="password" name="mpass" value="" /></p></if>
+		<p align="center"><input type="submit" value="Yes" /></p>
+	</form>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_DISABLE_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>User Disable Confirmation</h2></div>
+	<p align="center">Are you sure you want to disable user <strong><var $user_to_disable></strong>?</p>
+	<form id="confirm" action="<var $self>" method="post">
+		<input type="hidden" name="admin" value="<var $admin>" />
+		<input type="hidden" name="task" value="disableuser" />
+		<input type="hidden" name="username" value="<var $user_to_disable>" />
+		<if $account eq "admin"><p align="center">Manager password required. <input type="password" name="mpass" value="" /></p></if>
+		<p align="center"><input type="submit" value="Yes" /></p>
+	</form>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ENABLE_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>User Enable Confirmation</h2></div>
+	<p align="center">Are you sure you want to re-enable user <strong><var $user_to_enable></strong>?</p>
+	<form id="confirm" action="<var $self>" method="post">
+		<input type="hidden" name="admin" value="<var $admin>" />
+		<input type="hidden" name="task" value="enableuser" />
+		<input type="hidden" name="username" value="<var $user_to_enable>" />
+		<if $account eq "admin"><p align="center">Manager password required. <input type="password" name="mpass" value="" /></p></if>
+		<p align="center"><input type="submit" value="Yes" /></p>
+	</form>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_EDIT_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2><if $user_to_edit ne $username>Editing Details for User <var $user_to_edit></if><if $user_to_edit eq $username>Editing Profile</if></h2></div>
+	<form id="user_editing" action="<var $self>" method="post">
+		<input type="hidden" name="task" value="edituser" />
+		<input type="hidden" name="usernametoedit" value="<var $user_to_edit>" />
+		<if $user_to_edit ne $username><p align="center"><em>The management password is required only for promoting staff members to the Administrator class or editing an existing Administrator account.</em></p></if>
+		<table align="center">
+			<tbody>
+				<tr><td class="postblock">New Password</td><td><input type="password" name="newpassword" size="10" value="" autocomplete="off" /></td></tr>
+				<if $user_to_edit eq $username>
+					<tr><td class="postblock">Confirm Original Password</td><td><input type="password" name="originalpassword" size="10" value="" autocomplete="off" /> <input type="submit" value="Submit" /></td></tr>
+				</if>
+				<if $user_to_edit ne $username>
+					<tr><td class="postblock">New Account Type</td><td><select name="newclass"><option value="mod" <if $account eq 'mod'>selected="selected"</if>>Moderator</option><option value="globmod" <if $account eq 'admin'>selected="selected"</if>>Global Moderator</option><option value="admin" <if $account eq 'admin'>selected="selected"</if>>Administrator</option></select></td></tr>
+					<tr><td class="postblock">Jurisdiction</td><td><loop $boards><label><input name="reign" type="checkbox" value="<var $board>" <if $underpower>checked="checked"</if> /> <var $board></label><br /></loop></td></tr>
+					<tr><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" autocomplete="off" /> <input type="submit" value="Submit" /></td></tr>
+				</if>
+			</tbody>
+		</table>
+	</form>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ACTIVITY_HEAD => q{
+	<table align="center">
+		<tbody>
+			<tr>
+				<td style="padding:0.3em 1em 0.3em 0.3em">
+					<form action="<var $self>" method="get">
+						<input type="hidden" name="task" value="stafflog" />
+						<input type="hidden" name="view" value="user" />
+						<input type="hidden" name="perpage" value="<var $perpage>" />
+						View Staff: 
+						<select name="usertoview">
+							<option value="" selected="selected">Select</option>
+							<loop $staff><option value="<var $username>"><var $username></option></loop>
+						</select>
+						<input type="submit" value="View" />
+					</form>
+				</td>
+				<td style="padding:0.3em">
+					<form action="<var $self>" method="get">
+						<input type="hidden" name="task" value="stafflog" />
+						<input type="hidden" name="view" value="action" />
+						<input type="hidden" name="perpage" value="<var $perpage>" />
+						View Action: 
+						<select name="actiontoview">
+							<option value="">Select</option>
+							<option value="admin_edit">Administrative Edits</option>
+							<option value="admin_post">Manager Posts</option>
+							<option value="admin_delete">Administrative Deletions</option>
+							<option value="ipban">IP Bans</option>
+							<option value="ipban_edit">IP Ban Edits</option>
+							<option value="ipban_remove">IP Ban Removals</option>
+							<option value="wordban">Word Bans</option>
+							<option value="wordban_edit">Word Ban Edits</option>
+							<option value="wordban_remove">Word Ban Removals</option>
+							<option value="whitelist">IP Whitelist</option>
+							<option value="whitelist_edit">IP Whitelist Edits</option>
+							<option value="whitelist_remove">IP Whitelist Removals</option>
+							<option value="nocaptcha">Captcha Exemptions</option>
+							<option value="nocaptcha_edit">Revised Captcha Exemptions</option>
+							<option value="nocaptcha_remove">Removed Captcha Exemptions</option>
+							<option value="thread_sticky">Thread Stickies</option>
+							<option value="thread_unsticky">Thread Unstickies</option>
+							<option value="thread_lock">Thread Locks</option>
+							<option value="thread_unlock">Thread Unlocks</option>
+						</select>
+						<input type="submit" value="View" />
+					</form>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding:0.3em 1em 0.3em 0.3em">
+					<form action="<var $self>" method="get">
+						<input type="hidden" name="task" value="stafflog" />
+						<input type="hidden" name="view" value="ip" />
+						<input type="hidden" name="perpage" value="<var $perpage>" />
+						<input type="hidden" name="admin" value="<var $admin>" />
+						View Affected IP Address: 
+						<input type="text" name="iptoview" value="" size="15" />
+						<input type="submit" value="View" />
+					</form>
+				</td>
+				<td style="padding:0.3em">
+					<form action="<var $self>" method="get">
+						<input type="hidden" name="task" value="stafflog" />
+						<input type="hidden" name="view" value="post" />
+						<input type="hidden" name="perpage" value="<var $perpage>" />
+						<input type="hidden" name="admin" value="<var $admin>" />
+						View Affected Post: 
+						<input type="text" name="posttoview" value="" size="15" />
+						<input type="submit" value="View" />
+					</form>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+};
+
+use constant STAFF_ACTIVITY_PAGINATION => q{
+	<p align="center">
+		There are <strong><var $count></strong> actions recorded in the database. Showing <var $perpage> per page.
+		<br />
+		<if $page != 1><a href="<var $self>?task=stafflog&amp;page=1&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+		&lt;&lt;<if $page != 1></a></if> 
+		<span style="padding-left:1em">
+			<if $page != 1><a href="<var $self>?task=stafflog&amp;page=<var $page-1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+			&lt;<if $page != 1></a></if>
+		</span>
+		<span style="padding-left:2em;padding-right:2em">Page <var $page> of <var $number_of_pages></span> 
+		<span style="padding-right:1em">
+			<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $page+1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+			&gt;<if !$lastpage></a></if> 
+		</span>
+		<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $number_of_pages>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+		&gt;&gt;<if !$lastpage></a></if> 
+	</p>
+	<div align="center">
+		<form action="<var $self>" method="get" style="display:inline;padding-right:5em"><input type="hidden" name="task" value="stafflog" /><input type="hidden" name="view" value="<var $view>" /><if $view eq 'user'><input type="hidden" name="usertoview" value="<var $user_to_view>" /></if><if $view eq 'action'><input type="hidden" name="actiontoview" value="<var $action_to_view>" /></if><input type="hidden" name="sortby" value="<var $sortby>" /><input type="hidden" name="order" value="<var $order>" />Show <select name="perpage"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select> per page. <input type="submit" value="Change" /></form>
+		<form action="<var $self>" method="get" style="display:inline"><input type="hidden" name="task" value="stafflog" /><input type="hidden" name="view" value="<var $view>" /><input type="hidden" name="perpage" value="<var $perpage>" /><if $view eq 'user'><input type="hidden" name="usertoview" value="<var $user_to_view>" /></if><if $view eq 'action'><input type="hidden" name="actiontoview" value="<var $action_to_view>" /></if><input type="hidden" name="sortby" value="<var $sortby>" /><input type="hidden" name="order" value="<var $order>" />Jump to page: <input type="text" name="page" value="" size="2" /> <input type="submit" value="Jump" /><input type="hidden" name="task" value="stafflog" /></form>
+	</div>
+	<br />
+	
+
+};
+
+use constant STAFF_ACTIVITY_UNFILTERED => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Activity</h2></div>
+	}.STAFF_ACTIVITY_HEAD.q{
+	<!-- Admin w/ management pass may clean up -->
+	<div class="dellist"><h3>Viewing Full Log</h3></div>
+	}.STAFF_ACTIVITY_PAGINATION.q{
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=username&amp;order=<if $order =~ /^asc/ || $sortby ne 'username'>desc</if><if $order !~ /^asc/i && $sortby eq 'username'>asc</if>">User<if $sortby eq 'username'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=account&amp;order=<if $order =~ /^asc/ || $sortby ne 'account'>desc</if><if $order !~ /^asc/i && $sortby eq 'account'>asc</if>">Class<if $sortby eq 'account'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=action&amp;order=<if $order =~ /^asc/ || $sortby ne 'action'>desc</if><if $order !~ /^asc/i && $sortby eq 'action'>asc</if>">Action<if $sortby eq 'action'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th>Information</th>
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=date&amp;order=<if $order =~ /^asc/ || $sortby ne 'date'>desc</if><if $order !~ /^asc/ && $sortby eq 'date'>asc</if>">Date<if $sortby eq 'date'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog">IP Address</a></th>
+		</tr>
+	<loop $entries>
+		<tr class="row<var $rowtype>">
+			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
+			<td><if $account eq 'admin'>Administrator</if>
+			<if $account eq 'mod'>Moderator</if></td>
+			<td><var get_action_name($action)></td>
+			<td><var $info></td>
+			<td><var $date></td>
+			<td><var dec_to_dot($ip)></td>
+		</tr>
+	</loop>
+	</tbody>
+	</table>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ACTIVITY_BY_USER => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Activity</h2></div>
+	}.STAFF_ACTIVITY_HEAD.q{
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<h3 style="text-align:center">Actions by <var $user_to_view></h3>
+	}.STAFF_ACTIVITY_PAGINATION.q{
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th><a href="<var $self>?task=stafflog&amp;view=user&amp;usertoview=<var $user_to_view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=action&amp;order=<if $order =~ /^asc/ || $sortby ne 'action'>desc</if><if $order !~ /^asc/i && $sortby eq 'action'>asc</if>">Action<if $sortby eq 'action'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th>Info</th>
+			<th><a href="<var $self>?task=stafflog&amp;view=user&amp;usertoview=<var $user_to_view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=date&amp;order=<if $order =~ /^asc/ || $sortby ne 'date'>desc</if><if $order !~ /^asc/ && $sortby eq 'date'>asc</if>">Date<if $sortby eq 'date'> <if $order =~ /^asc/i>&#9660;</if><if $order !~ /^asc/>&#9650;</if></if></a></th>
+			<th>IP Address</th>
+		</tr>
+		<loop $entries>
+			<tr class="row<var $rowtype>">
+				<td><var get_action_name($action)></td>
+				<td><var $info></td>
+				<td><var $date></td>
+				<td><var dec_to_dot($ip)></td>
+			</tr>
+		</loop>
+	</tbody>
+	</table>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ACTIVITY_BY_ACTIONS => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Activity</h2></div>
+	}.STAFF_ACTIVITY_HEAD.q{
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<div class="dellist"><h3 align="center">Viewing Action: <var $action_name></h3></div>
+	}.STAFF_ACTIVITY_PAGINATION.q{
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=username&amp;order=<if $order =~ /^asc/ || $sortby ne 'username'>desc</if><if $order !~ /^asc/i && $sortby eq 'username'>asc</if>">User<if $sortby eq 'username'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=account&amp;order=<if $order =~ /^asc/ || $sortby ne 'account'>desc</if><if $order !~ /^asc/i && $sortby eq 'account'>asc</if>">Class<if $sortby eq 'account'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><var $content_name></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=date&amp;order=<if $order =~ /^asc/ || $sortby ne 'date'>desc</if><if $order !~ /^asc/ && $sortby eq 'date'>asc</if>">Date<if $sortby eq 'date'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th>IP Address</th>
+		</tr>
+	<loop $entries>
+		<tr class="row<var $rowtype>">
+			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
+			<td><if $account eq 'admin'>Administrator</if>
+			<if $account eq 'mod'>Moderator</if></td>
+			<td><var $info></td>
+			<td><var $date></td>
+			<td><var dec_to_dot($ip)></td>
+		</tr>
+	</loop>
+	</tbody>
+	</table>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ACTIVITY_BY_IP_ADDRESS => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Activity</h2></div>
+	}.STAFF_ACTIVITY_HEAD.q{
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<div class="dellist"><h3>Showing Activity on IP Address <var $ip_to_view></h3></div>
+	}.STAFF_ACTIVITY_PAGINATION.q{
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=username&amp;order=<if $order =~ /^asc/ || $sortby ne 'username'>desc</if><if $order !~ /^asc/i && $sortby eq 'username'>asc</if>">User<if $sortby eq 'username'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=account&amp;order=<if $order =~ /^asc/ || $sortby ne 'account'>desc</if><if $order !~ /^asc/i && $sortby eq 'account'>asc</if>">Class<if $sortby eq 'account'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=action&amp;order=<if $order =~ /^asc/ || $sortby ne 'action'>desc</if><if $order !~ /^asc/i && $sortby eq 'action'>asc</if>">Action<if $sortby eq 'action'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th>Information</th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=date&amp;order=<if $order =~ /^asc/ || $sortby ne 'date'>desc</if><if $order !~ /^asc/ && $sortby eq 'date'>asc</if>">Date<if $sortby eq 'date'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th>IP Address</th>
+		</tr>
+	<loop $entries>
+		<tr class="row<var $rowtype>">
+			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
+			<td><if $account eq 'admin'>Administrator</if>
+			<if $account eq 'mod'>Moderator</if></td>
+			<td><var $action></td>
+			<td><var $info></td>
+			<td><var $date></td>
+			<td><var dec_to_dot($ip)></td>
+		</tr>
+	</loop>
+	</tbody>
+	</table>
+	
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_ACTIVITY_BY_POST => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Staff Activity</h2></div>
+	}.STAFF_ACTIVITY_HEAD.q{
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<div class="dellist"><h3>Showing Activity on Post <var $post_to_view></h3></div>
+	}.STAFF_ACTIVITY_PAGINATION.q{
+	<table align="center" style="white-space: nowrap">
+	<tbody>
+		<tr class="managehead">
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=username&amp;order=<if $order =~ /^asc/ || $sortby ne 'username'>desc</if><if $order !~ /^asc/i && $sortby eq 'username'>asc</if>">User<if $sortby eq 'username'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=account&amp;order=<if $order =~ /^asc/ || $sortby ne 'account'>desc</if><if $order !~ /^asc/i && $sortby eq 'account'>asc</if>">Class<if $sortby eq 'account'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=action&amp;order=<if $order =~ /^asc/ || $sortby ne 'action'>desc</if><if $order !~ /^asc/i && $sortby eq 'action'>asc</if>">Action<if $sortby eq 'action'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th><a href="<var $self>?task=stafflog&amp;view=<var $view>&amp;page=<var $page>&amp;perpage=<var $perpage>&amp;sortby=date&amp;order=<if $order =~ /^asc/ || $sortby ne 'date'>desc</if><if $order !~ /^asc/ && $sortby eq 'date'>asc</if>">Date<if $sortby eq 'date'> <if $order =~ /^asc/i>&dtrif;</if><if $order !~ /^asc/>&utrif;</if></if></a></th>
+			<th>IP Address</th>
+		</tr>
+	<loop $entries>
+		<tr class="row<var $rowtype>">
+			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
+			<td><if $account eq 'admin'>Administrator</if>
+			<if $account eq 'mod'>Moderator</if></td>
+			<td><var $action></td>
+			<td><var $date></td>
+			<td><var dec_to_dot($ip)></td>
+		</tr>
+	</loop>
+	</tbody>
+	</table>
+}.NORMAL_FOOT_INCLUDE);
+
+use constant STAFF_EDIT_HISTORY => compile_template(MINI_HEAD_INCLUDE.q{
+	<h1 style="font-size: 1em; text-align: center; font-weight: bold">Staff Editing History for Post <var $num></h1>
+	<ul>
+		<loop $edits>
+			<li><span class="postername"><var $username></span> on <strong><var $date></strong>.</li> 
+		</loop>
+	</ul>
+}.MINI_FOOT_INCLUDE);
+
 use constant EDIT_SUCCESSFUL => compile_template(MINI_HEAD_REFRESH_INCLUDE.q{
-<p style="font-size: 1em; text-align: center; font-weight: bold">Update Successful!</p>
+	<p style="font-size: 1em; text-align: center; font-weight: bold">Update Successful!</p>
 }.MINI_FOOT_INCLUDE);
 
 
 use constant BAN_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
-<div class="dellist"><const S_MANABANS></div>
+<div class="dellist"><h2><const S_MANABANS></h2></div>
 
 <div class="postarea">
 <table><tbody><tr><td valign="middle">
@@ -730,7 +1112,7 @@ use constant BAN_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <tr class="managehead"><const S_BANTABLE></tr>
 
 <loop $bans>
-	<if $divider><tr class="managehead"><th colspan="6"></th></tr></if>
+	<if $divider><tr class="managehead"><th colspan="7"></th></tr></if>
 
 	<tr class="row<var $rowtype>">
 
@@ -753,9 +1135,10 @@ use constant BAN_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 	<td><var $comment></td>
 	<td><var $expirehuman></td>
-	<td style="text-align: center"><var $browsingban></td>
-	<td><a href="<var $self>?admin=<var $admin>&amp;task=removeban&amp;num=<var $num>"><const S_BANREMOVE></a> 
-	<a href="<var $self>?admin=<var $admin>&amp;task=baneditwindow&amp;num=<var $num>" target="newWindow" onclick="popUp('<var $self>?admin=<var $admin>&amp;task=baneditwindow&amp;num=<var $num>'); return false"><const S_BANEDIT></a></td>
+	<td style="text-align: center"><if $type eq 'ipban'><var $browsingban></if><if $type ne 'ipban'>--</if></td>
+	<td><var $username></td>
+	<td>[<a href="<var $self>?admin=<var $admin>&amp;task=removeban&amp;num=<var $num>"><const S_BANREMOVE></a>] 
+	[<a href="<var $self>?admin=<var $admin>&amp;task=baneditwindow&amp;num=<var $num>" target="_blank" onclick="popUp('<var $self>?admin=<var $admin>&amp;task=baneditwindow&amp;num=<var $num>'); return false"><const S_BANEDIT></a>]</td>
 	</tr>
 </loop>
 
@@ -1028,7 +1411,7 @@ use constant EDIT_WINDOW => compile_template(MINI_HEAD_INCLUDE.q{
 
 use constant PROXY_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
-<div class="dellist"><const S_MANAPROXY></div>
+<div class="dellist"><h2><const S_MANAPROXY></h2></div>
         
 <div class="postarea">
 <table><tbody><tr><td valign="bottom">
@@ -1079,7 +1462,7 @@ use constant PROXY_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 use constant SPAM_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 <div align="center">
-<div class="dellist"><const S_MANASPAM></div>
+<div class="dellist"><h2><const S_MANASPAM></h2></div>
 <p><const S_SPAMEXPL></p>
 
 <form action="<var $self>" method="post">
@@ -1111,7 +1494,7 @@ use constant SPAM_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 use constant SQL_DUMP_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
-<div class="dellist"><const S_MANASQLDUMP></div>
+<div class="dellist"><h2><const S_MANASQLDUMP></h2></div>
 
 <pre><code><var $database></code></pre>
 
@@ -1147,7 +1530,10 @@ use constant SQL_INTERFACE_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 use constant ADMIN_POST_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
+<div class="dellist"><h2>Manager Posting</h2></div>
+	
 <div align="center"><em><const S_NOTAGS></em></div>
+<br />
 
 <div class="postarea">
 <form id="postform" action="<var $self>" method="post" enctype="multipart/form-data">

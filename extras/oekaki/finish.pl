@@ -121,7 +121,7 @@ elsif($task eq "post")
 	open TMPFILE,$tmpname or die "Can't read uploaded file";
 
 	post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,
-	0,$captcha,ADMIN_PASS,0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo)),,);
+	0,$captcha,'',0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo)),,);
 
 	unlink $tmpname;
 }
@@ -152,7 +152,7 @@ elsif ($task eq "edit")
 	open TMPFILE,$tmpname or die "Can't read uploaded file";
 
 	edit_shit($num,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,
-	$captcha,ADMIN_PASS,0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo)));
+	$captcha,'',0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo)));
 	
 	unlink $tmpname;
 	
