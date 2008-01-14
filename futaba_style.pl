@@ -4,7 +4,9 @@ BEGIN { require "wakautils.pl" }
 
 use constant NORMAL_HEAD_INCLUDE => q{
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<?xml version="1.1" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="expires" content="Wed, 03 Nov 1999 12:21:14 GMT" />
@@ -62,7 +64,10 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
+
+<?xml version="1.1" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <title><if $title><var $title> - </if><const TITLE></title>
@@ -96,7 +101,10 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_REFRESH_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
+
+<?xml version="1.1" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <title><if $title><var $title> - </if><const TITLE></title>
@@ -211,8 +219,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
 				<if $thumbnail>
-					<script type="text/javascript">var expand<var $num> = 0; </script>
-					<a target="_blank" href="<var expand_image_filename($image)>" <if $width>onclick="var imgexpand=document.getElementById('img<var get_filename($image)>'); if (expand<var $num> == 0) {imgexpand.src='<var expand_image_filename($image)>';imgexpand.width='<var $width>';imgexpand.height='<var $height>'; expand<var $num>=1; } else { imgexpand.src='<var expand_filename($thumbnail)>'; imgexpand.height='<var $tn_height>'; imgexpand.width='<var $tn_width>'; expand<var $num>=0} return false"</if>>
+					<a target="_blank" href="<var expand_image_filename($image)>" >
 					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
 				</if>
 				<if !$thumbnail>
@@ -447,7 +454,9 @@ use constant ERROR_TEMPLATE_MINI => compile_template(MINI_HEAD_INCLUDE.q{
 
 use constant BAN_TEMPLATE => compile_template(q{
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<?xml version="1.1" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <link rel="stylesheet" type="text/css" href="http://www.desuchan.net/css/style.css" />
@@ -605,7 +614,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<if $locked ne 'yes'>[<a href="<var $self>?task=lock&amp;thread=<var $num>"><const S_LOCKOPTION></a>] <br /></if>
 	<if $locked eq 'yes'>[<a href="<var $self>?task=unlock&amp;thread=<var $num>"><const S_UNLOCKOPTION></a>] <br /></if>
 	</if>
-	[<a href="<var $self>?task=editpostwindow&amp;num=<var $num>" target="_blank" onclick="popUpPost('<var $self>?task=editpostwindow&amp;admin=<var $admin>&amp;num=<var $num>'); return false">Edit</a>]
+	[<a href="<var $self>?task=editpostwindow&amp;num=<var $num>&amp;admin=<var $admin>" target="_blank" onclick="popUpPost('<var $self>?task=editpostwindow&amp;admin=<var $admin>&amp;num=<var $num>'); return false">Edit</a>]
 	</td>
 	<td><var dec_to_dot($ip)>
 		[<a href="<var $self>?task=deleteall&amp;ip=<var $ip>"><const S_MPDELETEALL></a>]
