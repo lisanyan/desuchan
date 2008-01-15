@@ -288,7 +288,7 @@ elsif($task eq "editpostwindow")
 {
 	my $num = $query->param("num");
 	my $password = $query->param("password");
-	my $admin = $query->cookie("wakaadmin");
+	my $admin = $query->param("admin");
 	edit_window($num, $password, $admin);
 }
 elsif($task eq "delpostwindow")

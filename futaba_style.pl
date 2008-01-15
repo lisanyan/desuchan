@@ -4,9 +4,7 @@ BEGIN { require "wakautils.pl" }
 
 use constant NORMAL_HEAD_INCLUDE => q{
 
-<?xml version="1.1" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
- "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="expires" content="Wed, 03 Nov 1999 12:21:14 GMT" />
@@ -64,10 +62,7 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_INCLUDE => q{
-
-<?xml version="1.1" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
- "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <title><if $title><var $title> - </if><const TITLE></title>
@@ -101,10 +96,7 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_REFRESH_INCLUDE => q{
-
-<?xml version="1.1" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
- "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <title><if $title><var $title> - </if><const TITLE></title>
@@ -454,9 +446,7 @@ use constant ERROR_TEMPLATE_MINI => compile_template(MINI_HEAD_INCLUDE.q{
 
 use constant BAN_TEMPLATE => compile_template(q{
 
-<?xml version="1.1" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
- "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <link rel="stylesheet" type="text/css" href="http://www.desuchan.net/css/style.css" />
