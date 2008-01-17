@@ -819,7 +819,6 @@ use constant STAFF_ACTIVITY_HEAD => q{
 						<input type="hidden" name="task" value="stafflog" />
 						<input type="hidden" name="view" value="ip" />
 						<input type="hidden" name="perpage" value="<var $perpage>" />
-						<input type="hidden" name="admin" value="<var $admin>" />
 						View Affected IP Address: 
 						<input type="text" name="iptoview" value="" size="15" />
 						<input type="submit" value="View" />
@@ -830,7 +829,6 @@ use constant STAFF_ACTIVITY_HEAD => q{
 						<input type="hidden" name="task" value="stafflog" />
 						<input type="hidden" name="view" value="post" />
 						<input type="hidden" name="perpage" value="<var $perpage>" />
-						<input type="hidden" name="admin" value="<var $admin>" />
 						View Affected Post: 
 						<input type="text" name="posttoview" value="" size="15" />
 						<input type="submit" value="View" />
@@ -916,7 +914,7 @@ use constant STAFF_ACTIVITY_BY_USER => compile_template(MANAGER_HEAD_INCLUDE.q{
 		<loop $entries>
 			<tr class="row<var $rowtype>">
 				<td><var get_action_name($action)></td>
-				<td><var $info></td>
+				<td><var get_action_name($action,2)>: <var $info></td>
 				<td><var $date></td>
 				<td><var dec_to_dot($ip)></td>
 			</tr>
@@ -975,8 +973,8 @@ use constant STAFF_ACTIVITY_BY_IP_ADDRESS => compile_template(MANAGER_HEAD_INCLU
 			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
 			<td><if $account eq 'admin'>Administrator</if>
 			<if $account eq 'mod'>Moderator</if></td>
-			<td><var $action></td>
-			<td><var $info></td>
+			<td><var get_action_name($action)></td>
+			<td><var get_action_name($action,2)>: <var $info></td>
 			<td><var $date></td>
 			<td><var dec_to_dot($ip)></td>
 		</tr>
@@ -1006,7 +1004,7 @@ use constant STAFF_ACTIVITY_BY_POST => compile_template(MANAGER_HEAD_INCLUDE.q{
 			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
 			<td><if $account eq 'admin'>Administrator</if>
 			<if $account eq 'mod'>Moderator</if></td>
-			<td><var $action></td>
+			<td><var get_action_name($action)></td>
 			<td><var $date></td>
 			<td><var dec_to_dot($ip)></td>
 		</tr>

@@ -2009,14 +2009,14 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	{
 		$post_to_view = SQL_TABLE.','.$post_to_view if $post_to_view !~ /,/;
 		
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info=?;");
-		$count_get->execute($post_to_view) or make_error(S_SQLFAIL);
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info LIKE ?;");
+		$count_get->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 	
 		$count_get->finish();
 		
-		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".action,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username WHERE info=? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
-		$sth->execute($post_to_view) or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".action,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username WHERE info LIKE ? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		$sth->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
 	
 		my $rowtype = 1;
 		my $entry_number = 0; # Keep track of this for pagination
