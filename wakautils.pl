@@ -171,7 +171,7 @@ sub describe_allowed(%)
 	return join ", ",map { $_.($tags{$_}{args}?" (".(join ", ",sort keys %{$tags{$_}{args}}).")":"") } sort keys %tags;
 }
 
-sub do_wakabamark($;$$)
+sub do_wakabamark($$;$)
 {
 	my ($text,$handler,$simplify)=@_;
 	my $res;
@@ -195,7 +195,7 @@ sub do_wakabamark($;$$)
 				shift @lines;
 
 				while($lines[0]=~/^(?: {1,$spaces}|\t)(.*)/) { $item.="$1\n"; shift @lines }
-				$html.="<li>".do_wakabamark($item,$handler,1)."</li>";
+				$html.="<li>".do_spans($handler,split (/(?:\r\n|\n|\r)/,$item))."</li>";
 
 				if($skip) { while(@lines and $lines[0]=~/^\s*$/) { shift @lines; } } # skip empty lines
 			}
@@ -277,14 +277,15 @@ sub compile_template($;$)
 		$str=~s/\s+$//;
 		$str=~s/\n\s*/ /sg;
 	}
-
+	
+	my $count = 0; # Loop counter for <loop> tag internal variables $__a<count>
 	while($str=~m!(.*?)(<(/?)(var|const|if|loop)(?:|\s+(.*?[^\\]))>|$)!sg)
 	{
 		my ($html,$tag,$closing,$name,$args)=($1,$2,$3,$4,$5);
 
 		$html=~s/(['\\])/\\$1/g;
 		$code.="\$res.='$html';" if(length $html);
-		$args=~s/\\>/>/g;
+		$args=~s/\\>/>/g if ($args);
 
 		if($tag)
 		{
@@ -299,7 +300,7 @@ sub compile_template($;$)
 				elsif($name eq 'const') { my $const=eval $args; $const=~s/(['\\])/\\$1/g; $code.='$res.=\''.$const.'\';' }
 				elsif($name eq 'if') { $code.='if(eval{'.$args.'}){' }
 				elsif($name eq 'loop')
-				{ $code.='my $__a=eval{'.$args.'};if($__a){for(@$__a){my %__v=%{$_};my %__ov;for(keys %__v){$__ov{$_}=$$_;$$_=$__v{$_};}' }
+				{ $count++; $code.='my $__a'.$count.'=eval{'.$args.'};if($__a'.$count.'){for(@$__a'.$count.'){my %__v=%{$_};my %__ov;for(keys %__v){$__ov{$_}=$$_;$$_=$__v{$_};}' }
 			}
 		}
 	}
@@ -521,8 +522,8 @@ sub get_http($;$$$)
 	} until ($line=~/^\r?\n/);
 
 	# body
-	my ($line,$output);
-	while($line=<$sock>)
+	my ($bodyline,$output);
+	while($bodyline=<$sock>)
 	{
 		$output.=$line;
 		last if $maxsize and $output>=$maxsize;
@@ -567,6 +568,69 @@ sub make_http_forward($;$)
 		print "Content-Type: text/html\n";
 		print "\n";
 		print '<html><body><a href="'.$location.'">'.$location.'</a></body></html>';
+	}
+}
+
+sub make_date($$;@)
+{
+	my ($time,$style,@locdays)=@_;
+	my @days=qw(Sun Mon Tue Wed Thu Fri Sat);
+	my @months=qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+	@locdays=@days unless(@locdays);
+
+	if($style eq "2ch")
+	{
+		my @ltime=localtime($time);
+
+		return sprintf("%04d-%02d-%02d %02d:%02d",
+		$ltime[5]+1900,$ltime[4]+1,$ltime[3],$ltime[2],$ltime[1]);
+	}
+	elsif($style eq "futaba" or $style eq "0")
+	{
+		my @ltime=localtime($time);
+
+		return sprintf("%02d/%02d/%02d(%s)%02d:%02d",
+		$ltime[5]-100,$ltime[4]+1,$ltime[3],$locdays[$ltime[6]],$ltime[2],$ltime[1]);
+	}
+	elsif($style eq "localtime")
+	{
+		return scalar(localtime($time));
+	}
+	elsif($style eq "tiny")
+	{
+		my @ltime=localtime($time);
+
+		return sprintf("%02d/%02d %02d:%02d",
+		$ltime[4]+1,$ltime[3],$ltime[2],$ltime[1]);
+	}
+	elsif($style eq "http")
+	{
+		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
+		return sprintf("%s, %02d %s %04d %02d:%02d:%02d GMT",
+		$days[$wday],$mday,$months[$mon],$year+1900,$hour,$min,$sec);
+	}
+	elsif($style eq "cookie")
+	{
+		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
+		return sprintf("%s, %02d-%s-%04d %02d:%02d:%02d GMT",
+		$days[$wday],$mday,$months[$mon],$year+1900,$hour,$min,$sec);
+	}
+	elsif($style eq "month")
+	{
+		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
+		return sprintf("%s %d",
+		$months[$mon],$year+1900);
+	}
+	elsif($style eq "2ch-sep93")
+	{
+		my $sep93=timelocal(0,0,0,1,8,93);
+		my @ltime=localtime($time);
+		
+		# Use 2ch format above if before 1993 
+		return sprintf("%04d-%02d-%02d %02d:%02d",$ltime[5]+1900,$ltime[4]+1,$ltime[3],$ltime[2],$ltime[1]) if($time<$sep93);
+
+		return sprintf("%04d-%02d-%02d %02d:%02d",
+		1993,9,int ($time-$sep93)/86400+1,$ltime[2],$ltime[1]);
 	}
 }
 
@@ -743,68 +807,6 @@ sub process_tripcode($;$$$$)
 	return (clean_string(decode_string($name,$charset)),"");
 }
 
-sub make_date($$;@)
-{
-	my ($time,$style,@locdays)=@_;
-	my @days=qw(Sun Mon Tue Wed Thu Fri Sat);
-	my @months=qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
-	@locdays=@days unless(@locdays);
-
-	if($style eq "2ch")
-	{
-		my @ltime=localtime($time);
-
-		return sprintf("%04d-%02d-%02d %02d:%02d",
-		$ltime[5]+1900,$ltime[4]+1,$ltime[3],$ltime[2],$ltime[1]);
-	}
-	elsif($style eq "futaba" or $style eq "0")
-	{
-		my @ltime=localtime($time);
-
-		return sprintf("%02d/%02d/%02d(%s)%02d:%02d",
-		$ltime[5]-100,$ltime[4]+1,$ltime[3],$locdays[$ltime[6]],$ltime[2],$ltime[1]);
-	}
-	elsif($style eq "localtime")
-	{
-		return scalar(localtime($time));
-	}
-	elsif($style eq "tiny")
-	{
-		my @ltime=localtime($time);
-
-		return sprintf("%02d/%02d %02d:%02d",
-		$ltime[4]+1,$ltime[3],$ltime[2],$ltime[1]);
-	}
-	elsif($style eq "http")
-	{
-		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
-		return sprintf("%s, %02d %s %04d %02d:%02d:%02d GMT",
-		$days[$wday],$mday,$months[$mon],$year+1900,$hour,$min,$sec);
-	}
-	elsif($style eq "cookie")
-	{
-		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
-		return sprintf("%s, %02d-%s-%04d %02d:%02d:%02d GMT",
-		$days[$wday],$mday,$months[$mon],$year+1900,$hour,$min,$sec);
-	}
-	elsif($style eq "month")
-	{
-		my ($sec,$min,$hour,$mday,$mon,$year,$wday)=gmtime($time);
-		return sprintf("%s %d",
-		$months[$mon],$year+1900);
-	}
-	elsif($style eq "2ch-sep93")
-	{
-		my $sep93=timelocal(0,0,0,1,8,93);
-		return make_date($time,"2ch") if($time<$sep93);
-
-		my @ltime=localtime($time);
-
-		return sprintf("%04d-%02d-%02d %02d:%02d",
-		1993,9,int ($time-$sep93)/86400+1,$ltime[2],$ltime[1]);
-	}
-}
-
 sub parse_http_date($)
 {
 	my ($date)=@_;
@@ -819,10 +821,14 @@ sub parse_http_date($)
 sub cfg_expand($%)
 {
 	my ($str,%grammar)=@_;
-	$str=~s/%(\w+)%/
-		my @expansions=@{$grammar{$1}};
-		cfg_expand($expansions[rand @expansions],%grammar);
-	/ge;
+	
+	while ($str =~ /%\w+%/)
+	{
+		$str=~s/%(\w+)%/
+			my @expansions=@{$grammar{$1}};
+			$expansions[rand @expansions];
+		/ge;
+	}
 	return $str;
 }
 
@@ -1065,7 +1071,7 @@ sub spam_engine(%)
 	my %args=@_;
 	my @spam_files=@{$args{spam_files}||[]};
 	my @trap_fields=@{$args{trap_fields}||[]};
-	my %excluded_fields=map ($_=>1),@{$args{excluded_fields}||[]};
+	my %excluded_fields=map {$_=>1} @{$args{excluded_fields}||[]};
 	my $query=$args{query}||new CGI;
 	my $charset=$args{charset};
 

@@ -4,7 +4,8 @@ use CGI::Carp qw(fatalsToBrowser);
 
 use strict;
 
-use CGI;
+# use FCGI;
+use CGI::Fast;
 use DBI;
 
 #
@@ -28,10 +29,14 @@ BEGIN {
 BEGIN { require "captcha.pl"; }
 BEGIN { require "wakautils.pl"; }
 
+#
+# Global init
+#
 
-#
-# Optional modules
-#
+my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
+
+my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1});
+		
 
 my ($has_encode);
 
@@ -41,427 +46,36 @@ if(CONVERT_CHARSETS)
 	$has_encode=1 unless($@);
 }
 
-
-#
-# Global init
-#
-
-my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
-
-my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or make_error(S_SQLCONF);
-
 return 1 if(caller); # stop here if we're being called externally
 
-my $query=new CGI;
-my $task=($query->param("task") or $query->param("action"));
+my $query;
 
-# check for admin table
-init_admin_database() if(!table_exists(SQL_ADMIN_TABLE));
+#
+# Error Management
+#
 
-# check for proxy table
-init_proxy_database() if(!table_exists(SQL_PROXY_TABLE));
-
-# check for common site table
-init_common_site_database() if (!table_exists(SQL_COMMON_SITE_TABLE));
-
-# check for staff accounts
-first_time_setup_page() if (!table_exists(SQL_ACCOUNT_TABLE) && $query->param("task") ne 'entersetup' && !$query->param("admin"));
-
-# Check for .htaccess
-
-if (! -e "../.htaccess")
+sub make_error($;$)
 {
-	open (HTACCESSMAKE, ">../.htaccess");
-	print HTACCESSMAKE "RewriteEngine On\nOptions +FollowSymLinks +ExecCGI\n\n";
-	close HTACCESSMAKE;
-}
+	my ($error,$fromwindow)=@_;
 
-if(!table_exists(SQL_TABLE)) # check for comments table
-{
-	init_database();
-	build_cache();
-	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
-	exit;
-}
+	make_http_header();
 
-# Check for and remove old bans
-my $oldbans=$dbh->prepare("SELECT ival1, total FROM ".SQL_ADMIN_TABLE." WHERE expiration <= ".time()." AND expiration <> 0 AND expiration IS NOT NULL;");
-$oldbans->execute() or make_error(S_SQLFAIL);
-my @unbanned_ips;
-while (my $banrow = get_decoded_hashref($oldbans))
-{
-	push @unbanned_ips, $$banrow{ival1};
-	if ($$banrow{total} eq 'yes')
+	my $response = (!$fromwindow) ? encode_string(ERROR_TEMPLATE->(error=>$error)) : encode_string(ERROR_TEMPLATE_MINI->(error=>$error));
+	print $response;
+
+	if(ERRORLOG) # could print even more data, really.
 	{
-		my $ip = dec_to_dot($$banrow{ival1});
-		remove_htaccess_entry($ip);
+		open ERRORFILE,'>>'.ERRORLOG;
+		print ERRORFILE $error."\n";
+		print ERRORFILE $ENV{HTTP_USER_AGENT}."\n";
+		print ERRORFILE "**\n";
+		close ERRORFILE;
 	}
-}
-foreach (@unbanned_ips)
-{	
-	my $removeban = $dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE ival1=?") or make_error(S_SQLFAIL);
-	$removeban->execute($_) or make_error(S_SQLFAIL);
-}
 
-if(!$task)
-{
-	build_cache() unless -e HTML_SELF;
-	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
-}
-elsif($task eq "post")
-{
-	my $parent=$query->param("parent");
-	my $name=$query->param("field1");
-	my $email=$query->param("email");
-	my $subject=$query->param("subject");
-	my $comment=$query->param("comment");
-	my $file=$query->param("file");
-	my $password=$query->param("password");
-	my $nofile=$query->param("nofile");
-	my $captcha=$query->param("captcha");
-	my $admin = $query->param("admin");
-	my $no_captcha=$query->param("no_captcha");
-	my $no_format=$query->param("no_format");
-	my $sticky=$query->param("sticky");
-	my $lock=$query->param("lock");
-	# (postfix removed--oekaki only)
+	# delete temp files
 
-	post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,'',$sticky,$lock);
+	next;
 }
-elsif($task eq "delete")
-{
-	my $password = ($query->param("singledelete")) ? $query->param("postpassword") : $query->param("password");
-	my $fileonly = $query->param("fileonly");
-	my $archive=$query->param("archive");
-	my $fromwindow = $query->param("fromwindow"); # Is it from a window or a collapsable field?
-	my $admin=$query->param("admin");
-	my @posts = ($query->param("singledelete")) ? $query->param("deletepost") : $query->param("delete");
-
-	delete_stuff($password,$fileonly,$archive,$admin,$fromwindow,@posts);
-}
-elsif($task eq "admin")
-{
-	my $password=$query->param("berra"); # lol obfuscation
-	my $username=$query->param("desu"); # Fuck yes, you are the best obfuscation ever! 
-	my $nexttask=$query->param("nexttask");
-	my $savelogin=$query->param("savelogin");
-	my $admincookie=$query->cookie("wakaadmin");
-
-	do_login($username,$password,$nexttask,$savelogin,$admincookie);
-}
-elsif($task eq "logout")
-{
-	do_logout();
-}
-elsif($task eq "mpanel")
-{
-	my $admin = $query->cookie("wakaadmin");
-	make_admin_post_panel($admin);
-}
-elsif($task eq "deleteall")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $ip=$query->param("ip");
-	my $mask=$query->param("mask");
-	delete_all($admin,parse_range($ip,$mask));
-}
-elsif($task eq "bans")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $ip=$query->param("ip");
-	make_admin_ban_panel($admin,$ip);
-}
-elsif($task eq "addip")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $type=$query->param("type");
-	my $comment=$query->param("comment");
-	my $ip=$query->param("ip");
-	my $mask=$query->param("mask");
-	my $total=$query->param("total");
-	my $expiration=$query->param("expiration");
-	add_admin_entry($admin,$type,$comment,parse_range($ip,$mask),'',$total,$expiration); 
-}
-elsif($task eq "addstring")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $type=$query->param("type");
-	my $string=$query->param("string");
-	my $comment=$query->param("comment");
-	add_admin_entry($admin,$type,$comment,0,0,$string,'','');
-}
-elsif($task eq "removeban")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $num=$query->param("num");
-	remove_admin_entry($admin,$num,0,0);
-}
-elsif($task eq "proxy")
-{
-	my $admin = $query->cookie("wakaadmin");
-	make_admin_proxy_panel($admin);
-}
-elsif($task eq "addproxy")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $type=$query->param("type");
-	my $ip=$query->param("ip");
-	my $timestamp=$query->param("timestamp");
-	my $date=make_date(time(),DATE_STYLE);
-	add_proxy_entry($admin,$type,$ip,$timestamp,$date);
-}
-elsif($task eq "removeproxy")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $num=$query->param("num");
-	remove_proxy_entry($admin,$num);
-}
-elsif($task eq "spam")
-{
-	my ($admin);
-	my $admin = $query->cookie("wakaadmin");
-	make_admin_spam_panel($admin);
-}
-elsif($task eq "updatespam")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $spam=$query->param("spam");
-	update_spam_file($admin,$spam);
-}
-elsif($task eq "sqldump")
-{
-	my $admin = $query->cookie("wakaadmin");
-	make_sql_dump($admin);
-}
-elsif($task eq "sql")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $nuke=$query->param("nuke");
-	my $sql=$query->param("sql");
-	make_sql_interface($admin,$nuke,$sql);
-}
-elsif($task eq "mpost")
-{
-	my $admin = $query->cookie("wakaadmin");
-	make_admin_post($admin);
-}
-elsif($task eq "rebuild")
-{
-	my $admin = $query->cookie("wakaadmin");
-	do_rebuild_cache($admin);
-}
-elsif($task eq "nuke")
-{
-	my $admin = $query->cookie("wakaadmin");
-	do_nuke_database($admin);
-}
-elsif($task eq "banreport")
-{
-	host_is_banned(dot_to_dec($ENV{REMOTE_ADDR}));
-}
-elsif($task eq "adminedit")
-{
-	my $admin = $query -> cookie("wakaadmin");
-	my $num = $query->param("num");
-	my $type = $query->param("type");
-	my $comment = $query->param("comment");
-	my $ival1 = $query->param("ival1");
-	my $ival2 = $query->param("ival2");
-	my $sval1 = $query->param("sval1");
-	my $total = $query->param("total");
-	my $sec = $query->param("sec"); # Expiration Info
-	my $min = $query->param("min");
-	my $hour = $query->param("hour");
-	my $day = $query->param("day");
-	my $month = $query->param("month");
-	my $year = $query->param("year");
-	my $noexpire = $query->param("noexpire");
-	edit_admin_entry($admin,$num,$type,$comment,$ival1,$ival2,$sval1,$total,$sec,$min,$hour,$day,$month,$year,$noexpire);
-}
-elsif($task eq "baneditwindow")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $num = $query->param("num");
-	make_admin_ban_edit($admin, $num);	
-}
-elsif($task eq "editpostwindow")
-{
-	my $num = $query->param("num");
-	my $password = $query->param("password");
-	my $admin = $query->param("admin");
-	edit_window($num, $password, $admin);
-}
-elsif($task eq "delpostwindow")
-{
-	my $num = $query->param("num");
-	password_window($num, '', "delete");
-}
-elsif($task eq "editpost")
-{
-	my $num = $query->param("num");
-	my $name = $query->param("field1");
-	my $email = $query->param("email");
-	my $subject=$query->param("subject");
-	my $comment=$query->param("comment");
-	my $file=$query->param("file");
-	my $captcha=$query->param("captcha");
-	my $admin = $query->param("admin");               
-	my $no_captcha=$query->param("no_captcha");
-	my $no_format=$query->param("no_format");
-	my $postfix=$query->param("postfix");
-	my $password = $query->param("password");
-	my $killtrip = $query->param("killtrip");
-	edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip);
-}
-elsif($task eq "edit")
-{
-	my $num = $query->param("num");
-	my $admin_post = $query->param("admin_post");
-	password_window($num, $admin_post, "edit");
-}
-elsif($task eq "sticky")
-{
-	my $num = $query->param("thread");
-	my $admin = $query->cookie("wakaadmin");
-	sticky($num, $admin);
-}
-elsif($task eq "unsticky")
-{
-	my $num = $query->param("thread");
-	my $admin = $query->cookie("wakaadmin");
-	unsticky($num, $admin);
-}
-elsif($task eq "lock")
-{
-	my $num = $query->param("thread");
-	my $admin = $query->cookie("wakaadmin");
-	lock_thread($num, $admin);
-}
-elsif($task eq "unlock")
-{
-	my $num = $query->param("thread");
-	my $admin = $query->cookie("wakaadmin");
-	unlock_thread($num, $admin);
-}
-elsif($task eq "entersetup")
-{
-	my $password = $query->param("berra");
-	first_time_setup_start($password);
-}
-elsif ($task eq "setup")
-{
-	my $username = $query->param("username");
-	my $password = $query->param("password");
-	my $admin = $query->param("admin");
-	first_time_setup_finalize($admin,$username,$password);
-}
-elsif ($task eq "staff")
-{
-	my $admin = $query->cookie("wakaadmin");
-	manage_staff($admin);
-}
-
-# Staff Management Panels
-
-elsif ($task eq "deleteuserwindow")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $username = $query->param("username");
-	make_remove_user_account_window($admin,$username);
-}
-elsif ($task eq "disableuserwindow")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $username = $query->param("username");
-	make_disable_user_account_window($admin,$username);
-}
-elsif ($task eq "enableuserwindow")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $username = $query->param("username");
-	make_enable_user_account_window($admin,$username);
-}
-elsif ($task eq "edituserwindow")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $username = $query->param("username");
-	make_edit_user_account_window($admin,$username);
-}
-
-# Staff Management Subroutines
-
-elsif ($task eq "createuser")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $management_password = $query->param("mpass"); # Necessary for creating in Admin class
-	my $username = $query->param("usernametocreate");
-	my $password = $query->param("passwordtocreate");
-	my $type = $query->param("account");
-	my @reign = $query->param("reign");
-	create_user_account($admin,$username,$password,$type,$management_password,@reign);
-}
-elsif ($task eq "deleteuser")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $management_password = $query->param("mpass"); # Necessary for deleting Admin class 
-	my $username = $query->param("username");
-	remove_user_account($admin,$username,$management_password);
-}
-elsif ($task eq "disableuser")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $management_password = $query->param("mpass"); # Necessary for changing Admin class properites 
-	my $username = $query->param("username");
-	disable_user_account($admin,$username,$management_password);
-}
-elsif ($task eq "enableuser")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $management_password = $query->param("mpass");
-	my $username = $query->param("username");
-	enable_user_account($admin,$username,$management_password);
-}
-elsif ($task eq "edituser")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $management_password = $query->param("mpass");
-	my $username = $query->param("usernametoedit");
-	my $newpassword = $query->param("newpassword");
-	my $newclass = $query->param("newclass");
-	my $originalpassword = $query->param("originalpassword");
-	my @reign = $query->param("reign");
-	edit_user_account($admin,$management_password,$username,$newpassword,$newclass,$originalpassword,@reign);
-}
-
-# Staff Logging
-
-elsif ($task eq "stafflog")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $view = $query->param("view");
-	my $user_to_view = $query->param("usertoview");
-	my $action_to_view = $query->param("actiontoview");
-	my $ip_to_view = $query->param("iptoview");
-	my $post_to_view = $query->param("posttoview");
-	my $sortby = $query->param("sortby");
-	my $order = $query->param("order");
-	my $page = $query->param("page");
-	my $perpage = $query->param("perpage");
-	make_staff_activity_panel($admin,$view,$user_to_view,$action_to_view,$ip_to_view,$post_to_view,$sortby,$order,$page,$perpage);
-}
-elsif ($task eq "staffedits")
-{
-	my $admin = $query->cookie("wakaadmin");
-	my $num = $query->param("num");
-	show_staff_edit_history($admin,$num);
-}
-else
-{
-	make_error("Invalid task.");
-}
-
-$dbh->disconnect();
-
 
 #
 # Cache page creation
@@ -659,7 +273,7 @@ sub build_thread_cache_all()
 # Posting
 #
 
-sub post_stuff($$$$$$$$$$$$$$$)
+sub post_stuff($$$$$$$$$$$$$$$$)
 {
 	my ($parent,$name,$email,$subject,$comment,$file,$uploadname,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,$postfix,$sticky,$lock)=@_;
 	
@@ -700,6 +314,7 @@ sub post_stuff($$$$$$$$$$$$$$$)
 	if($admin) # check admin password - allow both encrypted and non-encrypted
 	{
 		($username,$accounttype) = check_password($admin);
+		$admin_post = 'yes'; # Mark as administrative post.
 	}
 	else
 	{
@@ -1307,7 +922,7 @@ sub unlock_thread($$)
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
-		make_error() if ($$row{locked} ne 'yes');
+		make_error("String Already Unlocked.") if ($$row{locked} ne 'yes');
 		my $update=$dbh->prepare("UPDATE ".SQL_TABLE." SET locked='' WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
@@ -1425,8 +1040,6 @@ sub host_is_banned($) # subroutine for handling bans
 	print encode_string(BAN_TEMPLATE->(numip => dec_to_dot($numip), comment => $comment, appeal => $appeal, expiration => $expiration));
 	
 	$sth->finish();
-	$dbh->{Warn}=0;
-	$dbh->disconnect();
 
 	if(ERRORLOG)
 	{
@@ -1439,7 +1052,7 @@ sub host_is_banned($) # subroutine for handling bans
 
 	# delete temp files
 
-	exit;
+	next;
 }
 
 sub admin_is_banned($)
@@ -1539,7 +1152,7 @@ sub add_proxy_entry($$$$$)
 	unless ($ip =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ && $1 <= 255 && $2 <= 255 && $3 <= 255 && $4 <= 255) {
 		make_error(S_BADIP);
 	}
-	if ($type = 'white') { 
+	if ($type == 'white') { 
 		$timestamp = $timestamp - PROXY_WHITE_AGE + time(); 
 	}
 	else
@@ -2259,7 +1872,7 @@ sub make_admin_post($)
 	print encode_string(ADMIN_POST_TEMPLATE->(admin=>$admin,username=>$username,type=>$type));
 }
 
-sub make_staff_activity_panel($$$$$$$$$)
+sub make_staff_activity_panel($$$$$$$$$$)
 {
 	my ($admin,$view,$user_to_view,$action_to_view,$ip_to_view,$post_to_view,$sortby,$order,$page,$perpage) = @_;
 	my ($username, $type) = check_password($admin);
@@ -2562,10 +2175,13 @@ sub do_rebuild_cache($)
 	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
 }
 
-sub add_admin_entry($$$$$$)
+sub add_admin_entry($$$$$$$$)
 {
-	my ($admin,$type,$comment,$ival1,$ival2,$sval1,$total,$expiration)=@_;
+	my ($admin,$type,$comment,$ip,$mask,$sval1,$total,$expiration)=@_;
+	
 	my ($sth);
+	
+	my ($ival1,$ival2) = parse_range($ip,$mask);
 
 	my ($username, $accounttype) = check_password($admin);
 
@@ -2604,7 +2220,7 @@ sub add_admin_entry($$$$$$)
 	make_http_forward(get_secure_script_name()."?task=bans",ALTERNATE_REDIRECT);
 }
 
-sub edit_admin_entry($$$$$$$$$$$$$$) # subroutine for editing entries in the admin table
+sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the admin table
 {
 	my ($admin,$num,$type,$comment,$ival1,$ival2,$sval1,$total,$sec,$min,$hour,$day,$month,$year,$noexpire)=@_;
 	my ($sth, $not_total_before, $past_ip, $expiration, $changes);
@@ -2747,8 +2363,10 @@ sub remove_ban_on_admin($)
 
 sub delete_all($$$)
 {
-	my ($admin,$ip,$mask)=@_;
+	my ($admin,$unparsedip,$unparsedmask)=@_;
 	my ($sth,$row,@posts);
+	
+	my ($ip, $mask) = parse_range($unparsedip,$unparsedmask);
 
 	check_password($admin);
 	
@@ -2905,35 +2523,6 @@ sub make_http_header()
 	print "\n";
 }
 
-sub make_error($;$)
-{
-	my ($error,$fromwindow)=@_;
-
-	make_http_header();
-
-	my $response = (!$fromwindow) ? encode_string(ERROR_TEMPLATE->(error=>$error)) : encode_string(ERROR_TEMPLATE_MINI->(error=>$error));
-	print $response;
-
-	if($dbh)
-	{
-		$dbh->{Warn}=0;
-		$dbh->disconnect();
-	}
-
-	if(ERRORLOG) # could print even more data, really.
-	{
-		open ERRORFILE,'>>'.ERRORLOG;
-		print ERRORFILE $error."\n";
-		print ERRORFILE $ENV{HTTP_USER_AGENT}."\n";
-		print ERRORFILE "**\n";
-		close ERRORFILE;
-	}
-
-	# delete temp files
-
-	exit;
-}
-
 sub get_script_name()
 {
 	return $ENV{SCRIPT_NAME};
@@ -2976,16 +2565,6 @@ sub get_filetypes()
 	my %filetypes=FILETYPES;
 	$filetypes{gif}=$filetypes{jpg}=$filetypes{png}=1;
 	return join ", ",map { uc } sort keys %filetypes;
-}
-
-sub dot_to_dec($)
-{
-	return unpack('N',pack('C4',split(/\./, $_[0]))); # wow, magic.
-}
-
-sub dec_to_dot($)
-{
-	return join('.',unpack('C4',pack('N',$_[0])));
 }
 
 sub parse_range($$)
@@ -3206,7 +2785,7 @@ sub first_time_setup_page()
 {
 	make_http_header();
 	print encode_string(FIRST_TIME_SETUP->());
-	exit;
+	next;
 }
 
 sub first_time_setup_start($)
@@ -3627,3 +3206,422 @@ sub get_boards()
 	
 	@boards;
 }
+
+#
+# Optional modules
+#
+
+#####################################################
+
+while ( $query = new CGI::Fast )
+{
+
+	# check for admin table
+	init_admin_database() if(!table_exists(SQL_ADMIN_TABLE));
+	
+	# check for proxy table
+	init_proxy_database() if(!table_exists(SQL_PROXY_TABLE));
+	
+	# check for common site table
+	init_common_site_database() if (!table_exists(SQL_COMMON_SITE_TABLE));
+	
+	# check for staff accounts
+	first_time_setup_page() if (!table_exists(SQL_ACCOUNT_TABLE) && $query->param("task") ne 'entersetup' && !$query->param("admin"));
+	
+	# Check for .htaccess
+	
+	if (! -e "../.htaccess")
+	{
+		open (HTACCESSMAKE, ">../.htaccess");
+		print HTACCESSMAKE "RewriteEngine On\nOptions +FollowSymLinks +ExecCGI\n\n";
+		close HTACCESSMAKE;
+	}
+	
+	if(!table_exists(SQL_TABLE)) # check for comments table
+	{
+		init_database();
+		build_cache();
+		make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
+		next;
+	}
+	
+	my $task=($query->param("task") or $query->param("action"));
+	
+	# Check for and remove old bans
+	my $oldbans=$dbh->prepare("SELECT ival1, total FROM ".SQL_ADMIN_TABLE." WHERE expiration <= ".time()." AND expiration <> 0 AND expiration IS NOT NULL;");
+	$oldbans->execute() or make_error(S_SQLFAIL);
+	my @unbanned_ips;
+	while (my $banrow = get_decoded_hashref($oldbans))
+	{
+		push @unbanned_ips, $$banrow{ival1};
+		if ($$banrow{total} eq 'yes')
+		{
+			my $ip = dec_to_dot($$banrow{ival1});
+			remove_htaccess_entry($ip);
+		}
+	}
+	foreach (@unbanned_ips)
+	{	
+		my $removeban = $dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE ival1=?") or make_error(S_SQLFAIL);
+		$removeban->execute($_) or make_error(S_SQLFAIL);
+	}
+	
+	if(!$task)
+	{
+		build_cache() unless -e HTML_SELF;
+		make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
+	}
+	elsif($task eq "post")
+	{
+		my $parent=$query->param("parent");
+		my $name=$query->param("field1");
+		my $email=$query->param("email");
+		my $subject=$query->param("subject");
+		my $comment=$query->param("comment");
+		my $file=$query->param("file");
+		my $password=$query->param("password");
+		my $nofile=$query->param("nofile");
+		my $captcha=$query->param("captcha");
+		my $admin = $query->param("admin");
+		my $no_captcha=$query->param("no_captcha");
+		my $no_format=$query->param("no_format");
+		my $sticky=$query->param("sticky");
+		my $lock=$query->param("lock");
+		# (postfix removed--oekaki only)
+	
+		post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,'',$sticky,$lock);
+	}
+	elsif($task eq "delete")
+	{
+		my $password = ($query->param("singledelete")) ? $query->param("postpassword") : $query->param("password");
+		my $fileonly = $query->param("fileonly");
+		my $archive=$query->param("archive");
+		my $fromwindow = $query->param("fromwindow"); # Is it from a window or a collapsable field?
+		my $admin=$query->param("admin");
+		my @posts = ($query->param("singledelete")) ? $query->param("deletepost") : $query->param("delete");
+	
+		delete_stuff($password,$fileonly,$archive,$admin,$fromwindow,@posts);
+	}
+	elsif($task eq "admin")
+	{
+		my $password=$query->param("berra"); # lol obfuscation
+		my $username=$query->param("desu"); # Fuck yes, you are the best obfuscation ever! 
+		my $nexttask=$query->param("nexttask");
+		my $savelogin=$query->param("savelogin");
+		my $admincookie=$query->cookie("wakaadmin");
+	
+		do_login($username,$password,$nexttask,$savelogin,$admincookie);
+	}
+	elsif($task eq "logout")
+	{
+		do_logout();
+	}
+	elsif($task eq "mpanel")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		make_admin_post_panel($admin);
+	}
+	elsif($task eq "deleteall")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $ip=$query->param("ip");
+		my $mask=$query->param("mask");
+		delete_all($admin,$ip,$mask);
+	}
+	elsif($task eq "bans")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $ip=$query->param("ip");
+		make_admin_ban_panel($admin,$ip);
+	}
+	elsif($task eq "addip")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $type=$query->param("type");
+		my $comment=$query->param("comment");
+		my $ip=$query->param("ip");
+		my $mask=$query->param("mask");
+		my $total=$query->param("total");
+		my $expiration=$query->param("expiration");
+		add_admin_entry($admin,$type,$comment,$ip,$mask,'',$total,$expiration); 
+	}
+	elsif($task eq "addstring")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $type=$query->param("type");
+		my $string=$query->param("string");
+		my $comment=$query->param("comment");
+		add_admin_entry($admin,$type,$comment,0,0,$string,'','');
+	}
+	elsif($task eq "removeban")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $num=$query->param("num");
+		remove_admin_entry($admin,$num,0,0);
+	}
+	elsif($task eq "proxy")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		make_admin_proxy_panel($admin);
+	}
+	elsif($task eq "addproxy")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $type=$query->param("type");
+		my $ip=$query->param("ip");
+		my $timestamp=$query->param("timestamp");
+		my $date=make_date(time(),DATE_STYLE);
+		add_proxy_entry($admin,$type,$ip,$timestamp,$date);
+	}
+	elsif($task eq "removeproxy")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $num=$query->param("num");
+		remove_proxy_entry($admin,$num);
+	}
+	elsif($task eq "spam")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		make_admin_spam_panel($admin);
+	}
+	elsif($task eq "updatespam")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $spam=$query->param("spam");
+		update_spam_file($admin,$spam);
+	}
+	elsif($task eq "sqldump")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		make_sql_dump($admin);
+	}
+	elsif($task eq "sql")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $nuke=$query->param("nuke");
+		my $sql=$query->param("sql");
+		make_sql_interface($admin,$nuke,$sql);
+	}
+	elsif($task eq "mpost")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		make_admin_post($admin);
+	}
+	elsif($task eq "rebuild")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		do_rebuild_cache($admin);
+	}
+	elsif($task eq "nuke")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		do_nuke_database($admin);
+	}
+	elsif($task eq "banreport")
+	{
+		host_is_banned(dot_to_dec($ENV{REMOTE_ADDR}));
+	}
+	elsif($task eq "adminedit")
+	{
+		my $admin = $query -> cookie("wakaadmin");
+		my $num = $query->param("num");
+		my $type = $query->param("type");
+		my $comment = $query->param("comment");
+		my $ival1 = $query->param("ival1");
+		my $ival2 = $query->param("ival2");
+		my $sval1 = $query->param("sval1");
+		my $total = $query->param("total");
+		my $sec = $query->param("sec"); # Expiration Info
+		my $min = $query->param("min");
+		my $hour = $query->param("hour");
+		my $day = $query->param("day");
+		my $month = $query->param("month");
+		my $year = $query->param("year");
+		my $noexpire = $query->param("noexpire");
+		edit_admin_entry($admin,$num,$type,$comment,$ival1,$ival2,$sval1,$total,$sec,$min,$hour,$day,$month,$year,$noexpire);
+	}
+	elsif($task eq "baneditwindow")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $num = $query->param("num");
+		make_admin_ban_edit($admin, $num);	
+	}
+	elsif($task eq "editpostwindow")
+	{
+		my $num = $query->param("num");
+		my $password = $query->param("password");
+		my $admin = $query->param("admin");
+		edit_window($num, $password, $admin);
+	}
+	elsif($task eq "delpostwindow")
+	{
+		my $num = $query->param("num");
+		password_window($num, '', "delete");
+	}
+	elsif($task eq "editpost")
+	{
+		my $num = $query->param("num");
+		my $name = $query->param("field1");
+		my $email = $query->param("email");
+		my $subject=$query->param("subject");
+		my $comment=$query->param("comment");
+		my $file=$query->param("file");
+		my $captcha=$query->param("captcha");
+		my $admin = $query->param("admin");               
+		my $no_captcha=$query->param("no_captcha");
+		my $no_format=$query->param("no_format");
+		my $postfix=$query->param("postfix");
+		my $password = $query->param("password");
+		my $killtrip = $query->param("killtrip");
+		edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip);
+	}
+	elsif($task eq "edit")
+	{
+		my $num = $query->param("num");
+		my $admin_post = $query->param("admin_post");
+		password_window($num, $admin_post, "edit");
+	}
+	elsif($task eq "sticky")
+	{
+		my $num = $query->param("thread");
+		my $admin = $query->cookie("wakaadmin");
+		sticky($num, $admin);
+	}
+	elsif($task eq "unsticky")
+	{
+		my $num = $query->param("thread");
+		my $admin = $query->cookie("wakaadmin");
+		unsticky($num, $admin);
+	}
+	elsif($task eq "lock")
+	{
+		my $num = $query->param("thread");
+		my $admin = $query->cookie("wakaadmin");
+		lock_thread($num, $admin);
+	}
+	elsif($task eq "unlock")
+	{
+		my $num = $query->param("thread");
+		my $admin = $query->cookie("wakaadmin");
+		unlock_thread($num, $admin);
+	}
+	elsif($task eq "entersetup")
+	{
+		my $password = $query->param("berra");
+		first_time_setup_start($password);
+	}
+	elsif ($task eq "setup")
+	{
+		my $username = $query->param("username");
+		my $password = $query->param("password");
+		my $admin = $query->param("admin");
+		first_time_setup_finalize($admin,$username,$password);
+	}
+	elsif ($task eq "staff")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		manage_staff($admin);
+	}
+	
+	# Staff Management Panels
+	
+	elsif ($task eq "deleteuserwindow")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $username = $query->param("username");
+		make_remove_user_account_window($admin,$username);
+	}
+	elsif ($task eq "disableuserwindow")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $username = $query->param("username");
+		make_disable_user_account_window($admin,$username);
+	}
+	elsif ($task eq "enableuserwindow")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $username = $query->param("username");
+		make_enable_user_account_window($admin,$username);
+	}
+	elsif ($task eq "edituserwindow")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $username = $query->param("username");
+		make_edit_user_account_window($admin,$username);
+	}
+	
+	# Staff Management Subroutines
+	
+	elsif ($task eq "createuser")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $management_password = $query->param("mpass"); # Necessary for creating in Admin class
+		my $username = $query->param("usernametocreate");
+		my $password = $query->param("passwordtocreate");
+		my $type = $query->param("account");
+		my @reign = $query->param("reign");
+		create_user_account($admin,$username,$password,$type,$management_password,@reign);
+	}
+	elsif ($task eq "deleteuser")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $management_password = $query->param("mpass"); # Necessary for deleting Admin class 
+		my $username = $query->param("username");
+		remove_user_account($admin,$username,$management_password);
+	}
+	elsif ($task eq "disableuser")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $management_password = $query->param("mpass"); # Necessary for changing Admin class properites 
+		my $username = $query->param("username");
+		disable_user_account($admin,$username,$management_password);
+	}
+	elsif ($task eq "enableuser")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $management_password = $query->param("mpass");
+		my $username = $query->param("username");
+		enable_user_account($admin,$username,$management_password);
+	}
+	elsif ($task eq "edituser")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $management_password = $query->param("mpass");
+		my $username = $query->param("usernametoedit");
+		my $newpassword = $query->param("newpassword");
+		my $newclass = $query->param("newclass");
+		my $originalpassword = $query->param("originalpassword");
+		my @reign = $query->param("reign");
+		edit_user_account($admin,$management_password,$username,$newpassword,$newclass,$originalpassword,@reign);
+	}
+	
+	# Staff Logging
+	
+	elsif ($task eq "stafflog")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $view = $query->param("view");
+		my $user_to_view = $query->param("usertoview");
+		my $action_to_view = $query->param("actiontoview");
+		my $ip_to_view = $query->param("iptoview");
+		my $post_to_view = $query->param("posttoview");
+		my $sortby = $query->param("sortby");
+		my $order = $query->param("order");
+		my $page = $query->param("page");
+		my $perpage = $query->param("perpage");
+		make_staff_activity_panel($admin,$view,$user_to_view,$action_to_view,$ip_to_view,$post_to_view,$sortby,$order,$page,$perpage);
+	}
+	elsif ($task eq "staffedits")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $num = $query->param("num");
+		show_staff_edit_history($admin,$num);
+	}
+	else
+	{
+		make_error("Invalid task.");
+	}
+
+}
+
+$dbh->disconnect();

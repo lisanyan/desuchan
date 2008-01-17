@@ -1560,8 +1560,6 @@ use constant ADMIN_POST_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 
 
-no strict;
-$stylesheets=get_stylesheets(); # make stylesheets visible to the templates
 use strict;
 
 sub get_filename($) { my $path=shift; $path=~m!([^/]+)$!; clean_string($1) }
@@ -1591,6 +1589,10 @@ sub get_stylesheets()
 
 	return \@stylesheets;
 }
+
+no strict;
+$stylesheets=get_stylesheets(); # make stylesheets visible to the templates
+use strict;
 
 1;
 

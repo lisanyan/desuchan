@@ -54,43 +54,55 @@ my $key=($query->param("key") or 'default');
 my $selector=($query->param("selector") or ".captcha");
 my $style=($query->cookie("wakabastyle") or DEFAULT_STYLE);
 
+#
+# Stylesheet functions
+#
+
+sub find_stylesheet_color($$)
+{
+	my ($style,$selector)=@_;
+
+	my ($sheet)=grep
+	{
+		my ($title)=m!([^/]+)\.css$!i;
+		$title=ucfirst $title;
+		$title=~s/_/ /g;
+		$title=~s/ ([a-z])/ \u$1/g;
+		$title=~s/([a-z])([A-Z])/$1 $2/g;
+		$title eq $style;
+	} glob(CSS_DIR."*.css");
+	return (128,0,0) unless($sheet);
+
+	my $contents;
+	open STYLESHEET,$sheet or return (128,0,0);
+	$contents.=$_ while(<STYLESHEET>);
+	close STYLESHEET;
+
+	if($contents=~/(?:}|^)\s+\Q$selector\E\s*{[^}]*color:\s*([^;}]+?)\s*(?:;|}|^)/s)
+	{
+		my $color=$1;
+		if($color=~/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
+		{
+			return (hex($1),hex($2),hex($3));
+		}
+		elsif($color=~/#([0-9a-f])([0-9a-f])([0-9a-f])/i)
+		{
+			return (hex($1x2),hex($2x2),hex($3x2));
+		}
+		elsif($color=~/rgb\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)/)
+		{
+			return ($1,$2,$3);
+		}
+	}
+	return (128,0,0);
+}
+
 my @foreground=find_stylesheet_color($style,$selector);
 my @background=(0xff,0xff,0xff);
 
 
 
 my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLCONF;
-init_captcha_database($dbh) unless(table_exists_captcha($dbh,SQL_CAPTCHA_TABLE));
-
-my $ip=($ENV{REMOTE_ADDR} or '0.0.0.0');
-my ($word,$timestamp)=get_captcha_word($dbh,$ip,$key);
-
-if(!$word)
-{
-	$word=make_word();
-	$timestamp=time();
-	save_captcha_word($dbh,$ip,$key,$word,$timestamp);
-}
-
-srand $timestamp;
-
-
-
-print $query->header(
-	-type=>'image/gif',
-#	-expires=>'+'.($timestamp+(CAPTCHA_LIFETIME)-time()),
-#	-expires=>'now',
-);
-
-binmode STDOUT;
-
-make_image($word);
-
-#
-# End of main code
-#
-
-
 
 #
 # Code generation
@@ -223,51 +235,6 @@ sub table_exists_captcha($$)
 
 
 #
-# Stylesheet functions
-#
-
-sub find_stylesheet_color($$)
-{
-	my ($style,$selector)=@_;
-
-	my ($sheet)=grep
-	{
-		my ($title)=m!([^/]+)\.css$!i;
-		$title=ucfirst $title;
-		$title=~s/_/ /g;
-		$title=~s/ ([a-z])/ \u$1/g;
-		$title=~s/([a-z])([A-Z])/$1 $2/g;
-		$title eq $style;
-	} glob(CSS_DIR."*.css");
-	return (128,0,0) unless($sheet);
-
-	my $contents;
-	open STYLESHEET,$sheet or return (128,0,0);
-	$contents.=$_ while(<STYLESHEET>);
-	close STYLESHEET;
-
-	if($contents=~/(?:}|^)\s+\Q$selector\E\s*{[^}]*color:\s*([^;}]+?)\s*(?:;|}|^)/s)
-	{
-		my $color=$1;
-		if($color=~/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
-		{
-			return (hex($1),hex($2),hex($3));
-		}
-		elsif($color=~/#([0-9a-f])([0-9a-f])([0-9a-f])/i)
-		{
-			return (hex($1x2),hex($2x2),hex($3x2));
-		}
-		elsif($color=~/rgb\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)/)
-		{
-			return ($1,$2,$3);
-		}
-	}
-	return (128,0,0);
-}
-
-
-
-#
 # Draw the actual image
 #
 
@@ -276,10 +243,7 @@ my (@pixels,$pixel_w,$pixel_h);
 sub make_image($)
 {
 	my ($word)=@_;
-	my ($width,$height);
-
-	$pixel_w=$width;
-	$pixel_h=$height;
+	my ($pixel_w,$pixel_h);
 
 	draw_string($word);
 
@@ -487,3 +451,37 @@ sub end_gif()
 	}
 	print pack('C',';');
 }
+
+#
+# Main code
+#
+
+init_captcha_database($dbh) unless(table_exists_captcha($dbh,SQL_CAPTCHA_TABLE));
+
+my $ip=($ENV{REMOTE_ADDR} or '0.0.0.0');
+my ($word,$timestamp)=get_captcha_word($dbh,$ip,$key);
+
+if(!$word)
+{
+	$word=make_word();
+	$timestamp=time();
+	save_captcha_word($dbh,$ip,$key,$word,$timestamp);
+}
+
+srand $timestamp;
+
+
+
+print $query->header(
+	-type=>'image/gif',
+#	-expires=>'+'.($timestamp+(CAPTCHA_LIFETIME)-time()),
+#	-expires=>'now',
+);
+
+binmode STDOUT;
+
+make_image($word);
+
+#
+# End of main code
+#
