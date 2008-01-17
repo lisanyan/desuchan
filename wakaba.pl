@@ -1829,7 +1829,8 @@ sub make_sql_interface($$$)
 	my ($admin,$nuke,$sql)=@_;
 	my ($sth,$row,@results);
 
-	check_password($admin);
+	my ($username, $type) = check_password($admin);
+	make_error("Insufficient privledges.") if $type ne 'admin';
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1856,7 +1857,7 @@ sub make_sql_interface($$$)
 	}
 
 	make_http_header();
-	print encode_string(SQL_INTERFACE_TEMPLATE->(admin=>$admin,nuke=>$nuke,
+	print encode_string(SQL_INTERFACE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,nuke=>$nuke,
 	results=>join "<br />",map { clean_string($_,1) } @results));
 }
 
@@ -1940,7 +1941,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,user_to_view=>$user_to_view,count=>$count,perpage=>$perpage,page=>$page,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,user_to_view=>$user_to_view,rowcount=>$count,perpage=>$perpage,page=>$page,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'action')
 	{
@@ -1972,7 +1973,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,count=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,rowcount=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'ip')
 	{
@@ -2002,7 +2003,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,ip_to_view=>$ip_to_view,count=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,ip_to_view=>$ip_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'post')
 	{
@@ -2032,7 +2033,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,post_to_view=>$post_to_view,count=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,post_to_view=>$post_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,entries=>\@entries));
 	}
 	else
 	{
@@ -2060,7 +2061,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,count=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 }
 
@@ -2107,13 +2108,15 @@ sub get_action_name($;$)
 	  thread_unlock => { name => "Thread Unlock", content => "Thread Parent" }
 	);
 	
-	# If a search on this action was requested, return an error.
-	make_error("Please select an action to view.") if (!defined($action{$action_to_view}) && $debug);
+	# If a search on an unknown action was requested, return an error.
+	make_error("Please select an action to view.") if (!defined($action{$action_to_view}) && $debug == 1);
 	
 	my ($name, $content) = (defined($action{$action_to_view})) ?
 				($action{$action_to_view}{name}, $action{$action_to_view}{content}) # Known action
 				: ($action_to_view, "Content"); # Unknown action in log. (Shouldn't happen.)
-	return ($debug) ? ($name, $content) : $name;
+	return ($name) if !$debug;
+	return ($name, $content) if $debug == 1;
+	return ($content) if $debug == 2;
 }
 
 sub do_login($$$$$)

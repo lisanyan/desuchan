@@ -843,7 +843,7 @@ use constant STAFF_ACTIVITY_HEAD => q{
 
 use constant STAFF_ACTIVITY_PAGINATION => q{
 	<p align="center">
-		There are <strong><var $count></strong> actions recorded in the database. Showing <var $perpage> per page.
+		There are <strong><var $rowcount></strong> actions recorded in the database. Showing <var $perpage> per page.
 		<br />
 		<if $page != 1><a href="<var $self>?task=stafflog&amp;page=1&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
 		&lt;&lt;<if $page != 1></a></if> 
@@ -890,7 +890,7 @@ use constant STAFF_ACTIVITY_UNFILTERED => compile_template(MANAGER_HEAD_INCLUDE.
 			<td><if $account eq 'admin'>Administrator</if>
 			<if $account eq 'mod'>Moderator</if></td>
 			<td><var get_action_name($action)></td>
-			<td><var $info></td>
+			<td><var get_action_name($action,2)>: <var $info></td>
 			<td><var $date></td>
 			<td><var dec_to_dot($ip)></td>
 		</tr>
@@ -902,7 +902,7 @@ use constant STAFF_ACTIVITY_UNFILTERED => compile_template(MANAGER_HEAD_INCLUDE.
 use constant STAFF_ACTIVITY_BY_USER => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<div class="dellist"><h2>Staff Activity</h2></div>
 	}.STAFF_ACTIVITY_HEAD.q{
-	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog&amp;perpage=<var $perpage>">Show All</a></p>
 	<h3 style="text-align:center">Actions by <var $user_to_view></h3>
 	}.STAFF_ACTIVITY_PAGINATION.q{
 	<table align="center" style="white-space: nowrap">
@@ -928,7 +928,7 @@ use constant STAFF_ACTIVITY_BY_USER => compile_template(MANAGER_HEAD_INCLUDE.q{
 use constant STAFF_ACTIVITY_BY_ACTIONS => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<div class="dellist"><h2>Staff Activity</h2></div>
 	}.STAFF_ACTIVITY_HEAD.q{
-	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog&amp;perpage=<var $perpage>">Show All</a></p>
 	<div class="dellist"><h3 align="center">Viewing Action: <var $action_name></h3></div>
 	}.STAFF_ACTIVITY_PAGINATION.q{
 	<table align="center" style="white-space: nowrap">
@@ -957,7 +957,7 @@ use constant STAFF_ACTIVITY_BY_ACTIONS => compile_template(MANAGER_HEAD_INCLUDE.
 use constant STAFF_ACTIVITY_BY_IP_ADDRESS => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<div class="dellist"><h2>Staff Activity</h2></div>
 	}.STAFF_ACTIVITY_HEAD.q{
-	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog&amp;perpage=<var $perpage>">Show All</a></p>
 	<div class="dellist"><h3>Showing Activity on IP Address <var $ip_to_view></h3></div>
 	}.STAFF_ACTIVITY_PAGINATION.q{
 	<table align="center" style="white-space: nowrap">
@@ -989,7 +989,7 @@ use constant STAFF_ACTIVITY_BY_IP_ADDRESS => compile_template(MANAGER_HEAD_INCLU
 use constant STAFF_ACTIVITY_BY_POST => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<div class="dellist"><h2>Staff Activity</h2></div>
 	}.STAFF_ACTIVITY_HEAD.q{
-	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog">Show All</a></p>
+	<p align="center" style="margin-top:0.2em"><a href="<var $self>?task=stafflog&amp;perpage=<var $perpage>">Show All</a></p>
 	<div class="dellist"><h3>Showing Activity on Post <var $post_to_view></h3></div>
 	}.STAFF_ACTIVITY_PAGINATION.q{
 	<table align="center" style="white-space: nowrap">
