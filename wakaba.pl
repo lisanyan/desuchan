@@ -35,7 +35,7 @@ BEGIN { require "wakautils.pl"; }
 
 my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
 
-my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1});
+my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL;
 		
 
 my ($has_encode);
@@ -2502,7 +2502,7 @@ sub remove_htaccess_entry($)
 		$file_contents .= $_;
 	}
 	$file_contents =~ s/(.*)\n\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\).*?\?task\=banreport\n(.*)/$1$2/s;
-	close HTACCESS;
+	close HTACCESSREAD;
 	open (HTACCESSWRITE, ">../.htaccess") or warn "Error writing to .htaccess ";
 	print HTACCESSWRITE $file_contents;
 	close HTACCESSWRITE;
@@ -3006,7 +3006,6 @@ sub edit_user_account($$$$$$@)
 
 	# Sanity check
 	make_error("Insufficient privledges.") if ($user_to_edit ne $username && $type ne 'admin');
-	make_error("Insufficient privledges.") if ($type ne 'admin');
 	make_error("No user specified.") if (!$user_to_edit);
 	make_error("Please input only Latin letters, numbers, and underscores for the password.") if ($newpassword && $newpassword !~ /^[\w\d_]+$/);
 	make_error("Please limit the password to thirty characters maximum.") if ($newpassword && length $newpassword > 30);
@@ -3018,20 +3017,18 @@ sub edit_user_account($$$$$$@)
 	my $row = $sth->fetchrow_hashref();
 
 	make_error("Cannot alter your own account class.") if ($newclass && $user_to_edit eq $username && $newclass ne $$row{account});
-	make_error("No boards specified for local moderator.") if (!@reign && ($newclass eq 'mod' || (!$newclass && $$row{account} eq 'mod')));
+	make_error("Cannot change your own reign.") if (@reign && join (" ", @reign) ne $$row{reign} && $user_to_edit eq $username);
 	
 	# Clear out unneeded changes
 	$newclass = '' if ($newclass eq $$row{account});
+	@reign = split (/ /, $$row{reign}) if (!@reign);
 	@reign = () if ($newclass && $newclass ne 'mod');
-	$forcereign = 1 if ($$row{account} eq 'mod'); # We should blank out the list of moderated boards if we're promoting a Moderator
 	
 	# Users can change their own password, but not others' if they are without administrative rights.
 	make_error("Password incorrect.") if ($user_to_edit eq $username && hide_critical_data($originalpassword,SECRET) ne $$row{password});
 	# Management password required for promoting an account to the Administrator class or editing an existing Administrator account.
 	make_error("Management password incorrect.") if ((($$row{account} eq 'admin' && $user_to_edit ne $username) || ($newclass ne $$row{account} && $newclass eq 'admin')) && $management_password ne ADMIN_PASS);
 	
-	$sth->finish();
-
 	if ($newpassword)
 	{
 		my $pass_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET password=? WHERE username=?;") or make_error(S_SQLFAIL);
@@ -3045,13 +3042,15 @@ sub edit_user_account($$$$$$@)
 		$class_change->finish();
 	}
 
-	if (@reign || $forcereign)
+	if ($$row{account} eq 'mod')
 	{
 		my $reignstring = join (" ", @reign);
 		my $reign_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET reign=? WHERE username=?;") or make_error(S_SQLFAIL);
 		$reign_change->execute($reignstring,$user_to_edit) or make_error(S_SQLFAIL);
 		$reign_change->finish();
 	}
+
+	$sth->finish();
 	
 	# Redirect, depending on context.		
 	make_http_forward(get_secure_script_name()."?task=admin") if ($username eq $user_to_edit);
@@ -3073,7 +3072,7 @@ sub create_user_account($$$$$@)
 	make_error("Please have a username of at least four characters.") if (length $user_to_create < 4);
 	make_error("Please limit the password to thirty characters maximum.") if (length $password > 30);
 	make_error("Passwords should be at least eight characters!") if (length $password < 8);
-	make_error("No boards specified for local moderator.") if (!@reign && $type eq 'mod');
+	make_error("No boards specified for local moderator.") if (!@reign && $account_type eq 'mod');
 	
 	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_create) or make_error(S_SQLFAIL);
