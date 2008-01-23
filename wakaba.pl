@@ -34,8 +34,7 @@ BEGIN { require "wakautils.pl"; }
 #
 
 my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
-
-my $dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL;
+my $dbh;
 		
 
 my ($has_encode);
@@ -465,7 +464,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	# Manager and deletion stuff - duuuuuh?
 
 	# generate date
-	my $date=make_date($time+11*3600,DATE_STYLE);
+	my $date=make_date($time+8*3600,DATE_STYLE);
 
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if(DISPLAY_ID);
@@ -785,7 +784,7 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# Manager and deletion stuff - duuuuuh?
 
 	# generate date
-	my $date=make_date($time+11*3600,DATE_STYLE);
+	my $date=make_date($time+8*3600,DATE_STYLE);
 
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if(DISPLAY_ID);
@@ -850,7 +849,7 @@ sub sticky($$)
 	}
 	$sth->finish();
 	
-	add_log_entry($username,'thread_sticky',SQL_TABLE.','.$num,make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_sticky',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
@@ -878,7 +877,7 @@ sub unsticky($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_unsticky',SQL_TABLE.','.$num,make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_unsticky',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
@@ -906,7 +905,7 @@ sub lock_thread($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_lock',SQL_TABLE.','.$num,make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_lock',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
@@ -932,7 +931,7 @@ sub unlock_thread($$)
 		make_error(S_NOTATHREAD);
 	}
 	
-	add_log_entry($username,'thread_unlock',SQL_TABLE.','.$num,make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_unlock',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
@@ -1534,7 +1533,7 @@ sub delete_stuff($$$$$@)
 	foreach $post (@posts)
 	{
 		my $ip = delete_post($post,$password,$fileonly,$archive);
-		add_log_entry($username,'admin_delete',SQL_TABLE.','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin);
+		add_log_entry($username,'admin_delete',SQL_TABLE.','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin);
 	}
 	
 	# update the cached HTML pages
@@ -2216,7 +2215,7 @@ sub add_admin_entry($$$$$$$$)
 	my $row = $select->fetchrow_hashref;
 	
 	# Add entry to staff log table
-	add_log_entry($username,$type,(($type eq 'ipban' || $type eq 'whitelist') ? dec_to_dot($ival1).' / '.dec_to_dot($ival2) : $sval1),make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$$row{num});
+	add_log_entry($username,$type,(($type eq 'ipban' || $type eq 'whitelist') ? dec_to_dot($ival1).' / '.dec_to_dot($ival2) : $sval1),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$$row{num});
 	
 	$select->finish();
 	
@@ -2275,7 +2274,7 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	$sth->finish;
 	
 	# Add log entry
-	add_log_entry($username,$type."_edit",$changes,make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
+	add_log_entry($username,$type."_edit",$changes,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
 	
 	make_http_header();
 	print encode_string(EDIT_SUCCESSFUL->());
@@ -2337,7 +2336,7 @@ sub remove_admin_entry($$$$)
 		remove_htaccess_entry($ip);
 		}
 		# Add log entry
-		add_log_entry($username,$$row{type}."_remove",(($$row{type} eq 'ipban' || $$row{type} eq 'whitelist') ? dec_to_dot($$row{ival1}).' / '.dec_to_dot($$row{ival2}) : $$row{sval1}),make_date(time()+11*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
+		add_log_entry($username,$$row{type}."_remove",(($$row{type} eq 'ipban' || $$row{type} eq 'whitelist') ? dec_to_dot($$row{ival1}).' / '.dec_to_dot($$row{ival2}) : $$row{sval1}),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
 	}
 	$totalverify_admin->finish();
 	
@@ -3218,6 +3217,8 @@ sub get_boards()
 while ( $query = new CGI::Fast )
 {
 
+	$dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL;
+	
 	# check for admin table
 	init_admin_database() if(!table_exists(SQL_ADMIN_TABLE));
 	
@@ -3623,7 +3624,7 @@ while ( $query = new CGI::Fast )
 	{
 		make_error("Invalid task.");
 	}
+	
+	$dbh->disconnect();
 
 }
-
-$dbh->disconnect();
