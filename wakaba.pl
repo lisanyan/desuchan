@@ -551,6 +551,7 @@ sub edit_window($$$) # ADDED subroutine for creating the post-edit window
 		make_error(S_WRONGPASS,1) if ($$row{admin_post} eq 'yes' && !$admin);
 		push @loop, $row;
 	}
+	return if (!@loop);
 	make_http_header();
 	print encode_string(POST_EDIT_TEMPLATE->(admin=>$admin, password=>$password, loop=>\@loop)); 
 	$sth->finish();
@@ -992,15 +993,17 @@ sub ban_check($$$$)
 	$sth=$dbh->prepare("SELECT sval1 FROM ".SQL_ADMIN_TABLE." WHERE type='wordban';") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
-	my $row;
+	my ($row, $badstring);
 	while($row=$sth->fetchrow_arrayref())
 	{
 		my $regexp=quotemeta $$row[0];
-		make_error(S_STRREF) if($comment=~/$regexp/);
-		make_error(S_STRREF) if($name=~/$regexp/);
-		make_error(S_STRREF) if($subject=~/$regexp/);
+		$badstring = 1 if($comment=~/$regexp/);
+		$badstring = 1 if($name=~/$regexp/);
+		$badstring = 1 if($subject=~/$regexp/);
 	}
 
+	make_error(S_STRREF) if $badstring;
+	
 	# etc etc etc
 
 	return(0);
@@ -1517,7 +1520,7 @@ sub process_file($$$$)
 sub delete_stuff($$$$$@)
 {
 	my ($password,$fileonly,$archive,$admin,$fromwindow,@posts)=@_;
-	my ($username, $type,$post);
+	my ($username, $type,$post,$ip);
 
 	if($admin)
 	{
@@ -1532,8 +1535,8 @@ sub delete_stuff($$$$$@)
 
 	foreach $post (@posts)
 	{
-		my $ip = delete_post($post,$password,$fileonly,$archive);
-		add_log_entry($username,'admin_delete',SQL_TABLE.','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin);
+		$ip = delete_post($post,$password,$fileonly,$archive);
+		add_log_entry($username,'admin_delete',SQL_TABLE.','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin && $ip);
 	}
 	
 	# update the cached HTML pages
@@ -1541,9 +1544,9 @@ sub delete_stuff($$$$$@)
 
 	if($admin)
 	{ make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT); }
-	elsif ($fromwindow)
+	elsif ($fromwindow && $ip)
 	{ make_http_header(); print encode_string(EDIT_SUCCESSFUL->());  }
-	else
+	elsif (!$fromwindow)
 	{ make_http_forward(HTML_SELF,ALTERNATE_REDIRECT); }
 }
 
@@ -2436,7 +2439,7 @@ sub check_password($;$)
 	
 	# Access check
 	my $sql_table = SQL_TABLE; # lol
-	make_error("Sorry, you do not have access rights to this board.<br /><a href=\"".get_script_name()."?task=logout\">Logout</a>") if ($$row{account} eq 'mod' && $$row{reign} !~ /\b$sql_table\b/o); 
+	make_error("Sorry, you do not have access rights to this board.<br />(Accessible: ".$$row{reign}.")<br /><a href=\"".get_script_name()."?task=logout\">Logout</a>") if ($$row{account} eq 'mod' && $$row{reign} !~ /\b$sql_table\b/o); 
 	make_error("This account is disabled.") if ($$row{disabled});
 	
 	my $encrypted_pass = crypt_password($$row{password});
