@@ -432,9 +432,6 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	$email=clean_string(decode_string($email,CHARSET));
 	$subject=clean_string(decode_string($subject,CHARSET));
 
-	# fix up the email/link
-	$email="mailto:$email" if $email and $email!~/^$protocol_re:/;
-	
 	# check subject field for 'noko' (legacy)
 	my $noko = 0;
 	if ($subject =~ m/^noko$/i)
@@ -447,6 +444,9 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	{
 		$noko = 1;
 	}
+	
+	# fix up the email/link
+	$email="mailto:$email" if $email and $email!~/^$protocol_re:/;
 
 	# format comment
 	$comment=format_comment(clean_string(decode_string($comment,CHARSET))) unless $no_format;
