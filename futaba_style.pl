@@ -843,18 +843,18 @@ use constant STAFF_ACTIVITY_PAGINATION => q{
 	<p align="center">
 		There are <strong><var $rowcount></strong> actions recorded in the database. Showing <var $perpage> per page.
 		<br />
-		<if $page != 1><a href="<var $self>?task=stafflog&amp;page=1&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+		<if $page != 1><a href="<var $self>?task=stafflog&amp;page=1&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>&amp;sortby=<var $sortby>&amp;order=<var $order>"></if>
 		&lt;&lt;<if $page != 1></a></if> 
 		<span style="padding-left:1em">
-			<if $page != 1><a href="<var $self>?task=stafflog&amp;page=<var $page-1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+			<if $page != 1><a href="<var $self>?task=stafflog&amp;page=<var $page-1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>&amp;sortby=<var $sortby>&amp;order=<var $order>"></if>
 			&lt;<if $page != 1></a></if>
 		</span>
 		<span style="padding-left:2em;padding-right:2em">Page <var $page> of <var $number_of_pages></span> 
 		<span style="padding-right:1em">
-			<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $page+1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+			<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $page+1>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>&amp;sortby=<var $sortby>&amp;order=<var $order>"></if>
 			&gt;<if !$lastpage></a></if> 
 		</span>
-		<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $number_of_pages>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>"></if>
+		<if !$lastpage><a href="<var $self>?task=stafflog&amp;page=<var $number_of_pages>&amp;perpage=<var $perpage>&amp;view=<var $view>&amp;usertoview=<var $user_to_view>&amp;actiontoview=<var $action_to_view>&amp;sortby=<var $sortby>&amp;order=<var $order>"></if>
 		&gt;&gt;<if !$lastpage></a></if> 
 	</p>
 	<div align="center">
