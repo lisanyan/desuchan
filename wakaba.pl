@@ -45,9 +45,12 @@ if(CONVERT_CHARSETS)
 	$has_encode=1 unless($@);
 }
 
+
 return 1 if(caller); # stop here if we're being called externally
 
 my $query;
+my $count = 0;
+my $maximum_allowed_loops = 250;
 
 #
 # Error Management
@@ -73,6 +76,7 @@ sub make_error($;$)
 
 	# delete temp files
 
+	last if $count > $maximum_allowed_loops;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
 
@@ -814,7 +818,7 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 		 if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
 	 }
 	
-	# close old dbh handle
+	# close old dbh
 	$select->finish(); 
 	
 	# finally, write to the database
@@ -1078,6 +1082,7 @@ sub host_is_banned($) # subroutine for handling bans
 
 	# delete temp files
 
+	last if $count > $maximum_allowed_loops;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
 
@@ -1088,6 +1093,9 @@ sub admin_is_banned($)
 	remove_ban_on_admin($admin) and next if ($type eq 'admin'); # Remove ban, go back to start of FastCGI loop.
 
 	make_error("Access denied due to banned host.");
+	
+	last if $count > $maximum_allowed_loops;
+	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
 
 sub flood_check($$$$$)
@@ -1939,7 +1947,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	
 	# Pagination
 	
-	$perpage = 50 if (!$perpage || $perpage !~ /^\d+$/);
+	$perpage = 50 if ($perpage !~ /^\d+$/);
 	$page = 1 if (!$page || $page !~ /^\d+$/);
 	my $offset = $perpage * ($page - 1);
 	my $first_entry_for_page = $offset + 1;
@@ -2263,7 +2271,7 @@ sub add_admin_entry($$$$$$$$)
 
 	$comment=clean_string(decode_string($comment,CHARSET));
 	
-	$expiration = ($expiration eq '' || $expiration == 0) ? 0 : $expiration;
+	$expiration = ($expiration eq '' || $expiration == 0) ? 0 : $expiration+time();
 	
 	make_error(S_STRINGFIELDMISSING) if ($type eq 'wordban' && $sval1 eq '');
 
@@ -2877,6 +2885,7 @@ sub first_time_setup_page()
 {
 	make_http_header();
 	print encode_string(FIRST_TIME_SETUP->());
+	last if $count > $maximum_allowed_loops;
 	next;
 }
 
@@ -3314,6 +3323,12 @@ sub get_boards()
 	@boards;
 }
 
+sub abort_user_action()
+{
+	last if $count > $maximum_allowed_loops;
+	next;
+}
+
 #
 # Optional modules
 #
@@ -3322,6 +3337,8 @@ sub get_boards()
 
 while ( $query = new CGI::Fast )
 {
+	$count++;
+	
 	# It may be nicer to put this outside the loop... but the database connection seems to expire and stay dead unless it is put in here.
 	$dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL; 
 	
@@ -3351,6 +3368,7 @@ while ( $query = new CGI::Fast )
 		init_database();
 		build_cache();
 		make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
+		last if $count > $maximum_allowed_loops;
 		next;
 	}
 	
@@ -3736,5 +3754,8 @@ while ( $query = new CGI::Fast )
 	}
 	
 	$dbh->disconnect();
+	
+	warn ("Script change detected of $ENV{SCRIPT_NAME}!") and last if -M $ENV{SCRIPT_FILENAME} < 0;
+	$count = 0 and last if $count > $maximum_allowed_loops; # Hoping this will help with memory leaks. fork() may be preferable
 
 }

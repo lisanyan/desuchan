@@ -479,7 +479,7 @@ use constant BAN_TEMPLATE => compile_template(q{
 
 use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 
-[<a href="<var expand_filename(HTML_SELF)>"><const S_MANARET></a>]
+[<a href="<var <var get_script_name()>"><const S_MANARET></a>]
 <if $admin>
 	[<a href="<var $self>?task=mpanel"><const S_MANAPANEL></a>]
 	[<a href="<var $self>?task=bans"><const S_MANABANS></a>]
