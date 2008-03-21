@@ -318,7 +318,7 @@ sub compile_template($;$)
 		'$$_=$__ov{$_} for(keys %__ov);'.
 		'return $res; }';
 
-	die "Template format error" unless $sub;
+	die "Template format error: $@" unless $sub;
 
 	return $sub;
 }
@@ -736,16 +736,6 @@ sub get_xhtml_content_type(;$$)
 	$type.="; charset=$charset" if($charset);
 
 	return $type;
-}
-
-sub expand_filename($)
-{
-	my ($filename)=@_;
-	return $filename if($filename=~m!^/!);
-	return $filename if($filename=~m!^\w+:!);
-
-	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
-	return $self_path.$filename;
 }
 
 #
@@ -1206,27 +1196,13 @@ sub make_thumbnail($$$$$;$)
 
 	$convert="convert" unless($convert);
 	`$convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality $magickname $thumbnail`;
+	warn "$convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality $magickname $thumbnail";
 
 	return 1 unless($? || -s $thumbnail == 0);
 
 	unlink $thumbnail if (-e $thumbnail);
 
-	if ($filename=~/\.jpg$/)
-	{
-		`djpeg $magickname | $convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality - $thumbnail`; # Desuchan workaround...
-	}
-	else
-	{
-		`cjpeg -quality 90 $filename | $convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality - $thumbnail`;
-	}
-		
-	return 1 unless($? || -s $thumbnail == 0);
-
-	unlink $thumbnail if (-e $thumbnail);
-
-	# if that fails, try pnmtools instead
-
-	# disregard that, just exit (Desuchan fix)
+	# just exit here (Desuchan fix)
 
 	return 0;
 
@@ -1234,23 +1210,27 @@ sub make_thumbnail($$$$$;$)
 	{
 		`djpeg $filename | pnmscale -width $width -height $height | cjpeg -quality $quality > $thumbnail`;
 		# could use -scale 1/n
-		return 1 unless($?);
+		return 1 unless($? || -s $thumbnail == 0);
+		unlink $thumbnail if (-e $thumbnail);
 	}
 	elsif($filename=~/\.png$/)
 	{
 		`pngtopnm $filename | pnmscale -width $width -height $height | cjpeg -quality $quality > $thumbnail`;
-		return 1 unless($?);
+		return 1 unless($? || -s $thumbnail == 0);
+		unlink $thumbnail if (-e $thumbnail);
 	}
 	elsif($filename=~/\.gif$/)
 	{
 		`giftopnm $filename | pnmscale -width $width -height $height | cjpeg -quality $quality > $thumbnail`;
-		return 1 unless($?);
+		return 1 unless($? || -s $thumbnail == 0);
+		unlink $thumbnail if (-e $thumbnail);
 	}
 
 	# try Mac OS X's sips
 
 	`sips -z $height $width -s formatOptions normal -s format jpeg $filename --out $thumbnail >/dev/null`; # quality setting doesn't seem to work
-	return 1 unless($?);
+	return 1 unless($? || -s $thumbnail == 0);
+	unlink $thumbnail if (-e $thumbnail);
 
 	# try PerlMagick (it sucks)
 

@@ -1,10 +1,9 @@
 #!/usr/bin/perl
 
-use CGI::Carp qw(fatalsToBrowser);
+use CGI::Carp qw(fatalsToBrowser); # Dump all errors to the browser window.
 
 use strict;
 
-# use FCGI;
 use CGI::Fast;
 use DBI;
 
@@ -16,17 +15,8 @@ use lib '.';
 BEGIN { require "config.pl"; }
 BEGIN { require "config_defaults.pl"; }
 BEGIN { require "strings_en.pl"; }		# edit this line to change the language
-BEGIN { 
-	if (defined(&OEKAKI_BOARD) && &OEKAKI_BOARD == 1)
-	{
-		require "oekaki_style.pl";
-	}
-	else
-	{
-		require "futaba_style.pl";
-	}
-}						
-BEGIN { require "captcha.pl"; }
+BEGIN { require "futaba_style.pl"; }						
+#BEGIN { require "captcha.pl"; }
 BEGIN { require "wakautils.pl"; }
 
 #
@@ -35,7 +25,7 @@ BEGIN { require "wakautils.pl"; }
 
 my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
 my $dbh;
-		
+
 
 my ($has_encode);
 
@@ -48,21 +38,21 @@ if(CONVERT_CHARSETS)
 
 return 1 if(caller); # stop here if we're being called externally
 
-my $query;
+my ($query, $board);
 my $count = 0;
-my $maximum_allowed_loops = 250;
+my $maximum_allowed_loops = MAX_FCGI_LOOPS;
 
 #
 # Error Management
 #
 
-sub make_error($;$)
+sub make_error($;$$)
 {
 	my ($error,$fromwindow)=@_;
 
 	make_http_header();
 
-	my $response = (!$fromwindow) ? encode_string(ERROR_TEMPLATE->(error=>$error)) : encode_string(ERROR_TEMPLATE_MINI->(error=>$error));
+	my $response = (!$fromwindow) ? encode_string(ERROR_TEMPLATE->(error=>$error,stylesheets=>get_stylesheets(),board=>$board)) : encode_string(ERROR_TEMPLATE_MINI->(error=>$error,stylesheets=>get_stylesheets(),board=>$board));
 	print $response;
 
 	if(ERRORLOG) # could print even more data, really.
@@ -89,8 +79,8 @@ sub build_cache()
 	my ($sth,$row,@thread);
 	my $page=0;
 	
-	# grab all posts, in thread order (ugh, ugly kludge)
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN num ELSE parent END ASC, num ASC;") or make_error(S_SQLFAIL);
+	# grab all posts, in thread order, starting with the stickies
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN num ELSE parent END ASC, num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	$row=get_decoded_hashref($sth);
@@ -120,7 +110,7 @@ sub build_cache()
 
 		my $total=get_page_count(scalar @threads);
 		my @pagethreads;
-		while(@pagethreads=splice @threads,0,IMAGES_PER_PAGE)
+		while(@pagethreads=splice @threads,0,$board->option('IMAGES_PER_PAGE'))
 		{
 			build_cache_page($page,$total,@pagethreads);
 			$page++;
@@ -128,9 +118,9 @@ sub build_cache()
 	}
 
 	# check for and remove old pages
-	while(-e $page.PAGE_EXT)
+	while(-e $board->path().'/'.$page.PAGE_EXT)
 	{
-		unlink $page.PAGE_EXT;
+		unlink $board->path().'/'.$page.PAGE_EXT;
 		$page++;
 	}
 	
@@ -142,8 +132,8 @@ sub build_cache_page($$@)
 	my ($page,$total,@threads)=@_;
 	my ($filename,$tmpname);
 
-	if($page==0) { $filename=HTML_SELF; }
-	else { $filename=$page.PAGE_EXT; }
+	if($page==0) { $filename=$board->path().'/'.$board->option('HTML_SELF'); }
+	else { $filename=$board->path().'/'.$page.PAGE_EXT; }
 
 	# do abbrevations and such
 	foreach my $thread (@threads)
@@ -154,8 +144,8 @@ sub build_cache_page($$@)
 		my $images=grep { $$_{image} } @replies;
 		my $curr_replies=$replies;
 		my $curr_images=$images;
-		my $max_replies=REPLIES_PER_THREAD;
-		my $max_images=(IMAGE_REPLIES_PER_THREAD or $images);
+		my $max_replies=$board->option('REPLIES_PER_THREAD');
+		my $max_images=($board->option('IMAGE_REPLIES_PER_THREAD') or $images);
 
 		# drop replies until we have few enough replies and images
 		while($curr_replies>$max_replies or $curr_images>$max_images)
@@ -173,7 +163,7 @@ sub build_cache_page($$@)
 		# abbreviate the remaining posts
 		foreach my $post (@{$$thread{posts}})
 		{
-			my $abbreviation=abbreviate_html($$post{comment},MAX_LINES_SHOWN,APPROX_LINE_LENGTH);
+			my $abbreviation=abbreviate_html($$post{comment},$board->option('MAX_LINES_SHOWN'),$board->option('APPROX_LINE_LENGTH'));
 			if($abbreviation)
 			{
 				$$post{comment}=$abbreviation;
@@ -186,7 +176,7 @@ sub build_cache_page($$@)
 	my @pages=map +{ page=>$_ },(0..$total-1);
 	foreach my $p (@pages)
 	{
-		if($$p{page}==0) { $$p{filename}=expand_filename(HTML_SELF) } # first page
+		if($$p{page}==0) { $$p{filename}=expand_filename($board->option('HTML_SELF')) } # first page
 		else { $$p{filename}=expand_filename($$p{page}.PAGE_EXT) }
 		if($$p{page}==$page) { $$p{current}=1 } # current page, no link
 	}
@@ -196,13 +186,15 @@ sub build_cache_page($$@)
 	$nextpage=$pages[$page+1]{filename} if($page!=$total-1);
 
 	print_page($filename,PAGE_TEMPLATE->(
-		postform=>(ALLOW_TEXTONLY or ALLOW_IMAGES),
-		image_inp=>ALLOW_IMAGES,
-		textonly_inp=>(ALLOW_IMAGES and ALLOW_TEXTONLY),
+		pages=>\@pages,
+		postform=>($board->option('ALLOW_TEXTONLY') or $board->option('ALLOW_IMAGES')),
+		image_inp=>$board->option('ALLOW_IMAGES'),
+		textonly_inp=>($board->option('ALLOW_IMAGES') and $board->option('ALLOW_TEXTONLY')),
 		prevpage=>$prevpage,
 		nextpage=>$nextpage,
-		pages=>\@pages,
-		threads=>\@threads
+		threads=>\@threads,
+		stylesheets=>get_stylesheets('board'),
+		board=>$board
 	));
 }
 
@@ -212,7 +204,7 @@ sub build_thread_cache($)
 	my ($sth,$row,@thread);
 	my ($filename,$tmpname);
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num=? OR parent=? ORDER BY num ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=? ORDER BY num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute($thread,$thread) or make_error(S_SQLFAIL);
 
 	while($row=get_decoded_hashref($sth)) { push(@thread,$row); }
@@ -221,17 +213,19 @@ sub build_thread_cache($)
 
 	make_error(S_NOTHREADERR) if($thread[0]{parent});
 
-	$filename=RES_DIR.$thread.PAGE_EXT;
+	$filename=$board->path().'/'.$board->option('RES_DIR').$thread.PAGE_EXT;
 
 	print_page($filename,PAGE_TEMPLATE->(
+		threads=>[{posts=>\@thread}],
 		thread=>$thread,
-		postform=>(ALLOW_TEXT_REPLIES or ALLOW_IMAGE_REPLIES),
-		image_inp=>ALLOW_IMAGE_REPLIES,
+		postform=>($board->option('ALLOW_TEXT_REPLIES') or $board->option('ALLOW_IMAGE_REPLIES')),
+		image_inp=>$board->option('ALLOW_IMAGE_REPLIES'),
 		textonly_inp=>0,
 		dummy=>$thread[$#thread]{num},
 		lockedthread=>$thread[0]{locked},
-		threads=>[{posts=>\@thread}])
-	);
+		stylesheets=>get_stylesheets('thread'),
+		board=>$board
+	));
 }
 
 sub print_page($$)
@@ -244,7 +238,7 @@ sub print_page($$)
 
 	if(USE_TEMPFILES)
 	{
-		my $tmpname=RES_DIR.'tmp'.int(rand(1000000000));
+		my $tmpname=$board->path().'/'.$board->option('RES_DIR').'tmp'.int(rand(1000000000));
 
 		open (PAGE,">$tmpname") or make_error(S_NOTWRITE);
 		print PAGE $contents;
@@ -267,7 +261,7 @@ sub build_thread_cache_all()
 {
 	my ($sth,$row,@thread);
 
-	$sth=$dbh->prepare("SELECT num FROM ".SQL_TABLE." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	while($row=$sth->fetchrow_arrayref())
@@ -282,9 +276,9 @@ sub build_thread_cache_all()
 # Posting
 #
 
-sub post_stuff($$$$$$$$$$$$$$$$)
+sub post_stuff($$$$$$$$$$$$$$$$$)
 {
-	my ($parent,$name,$email,$subject,$comment,$file,$uploadname,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,$postfix,$sticky,$lock)=@_;
+	my ($parent,$name,$email,$subject,$comment,$file,$uploadname,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,$postfix,$sticky,$lock,$admin_post_mode)=@_;
 	
 	# get a timestamp for future use
 	my $time=time();
@@ -294,16 +288,15 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 
 	# check that the request came in as a POST, or from the command line
 	make_error(S_UNJUST) if($ENV{REQUEST_METHOD} and $ENV{REQUEST_METHOD} ne "POST");
-	
-	# ADDED - Is the thread stickied?
 
+	# check whether the parent thread is stickied
 	if ($parent)
 	{
-		my $selectsticky=$dbh->prepare("SELECT stickied, locked FROM ".SQL_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+		my $selectsticky=$dbh->prepare("SELECT stickied, locked FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
 		$selectsticky->execute($parent) or make_error(S_SQLFAIL);
 		my $sticky_check = $selectsticky->fetchrow_hashref;
 	
-		if ($$sticky_check{locked} eq 'yes' && !$admin)
+		if ($$sticky_check{locked} eq 'yes' && !$admin_post_mode)
 		{
 			make_error(S_THREADLOCKEDERROR);
 		}
@@ -312,7 +305,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 		{
 			$sticky = 1;
 		} 
-		elsif (!$admin) 
+		elsif (!$admin_post_mode) 
 		{
 			$sticky = 0;
 		}
@@ -320,9 +313,9 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	}
 	
 	my ($username, $accounttype);
-	if($admin) # check admin password - allow both encrypted and non-encrypted
+	if($admin_post_mode) # check admin password - allow both encrypted and non-encrypted
 	{
-		($username,$accounttype) = check_password($admin);
+		($username,$accounttype) = check_password($admin,'mpost');
 		$admin_post = 'yes'; # Mark as administrative post.
 	}
 	else
@@ -333,19 +326,19 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 		# check what kind of posting is allowed
 		if($parent)
 		{
-			make_error(S_NOTALLOWED) if($file and !ALLOW_IMAGE_REPLIES);
-			make_error(S_NOTALLOWED) if(!$file and !ALLOW_TEXT_REPLIES);
+			make_error(S_NOTALLOWED) if($file and !($board->option('ALLOW_IMAGE_REPLIES')));
+			make_error(S_NOTALLOWED) if(!$file and !($board->option('ALLOW_TEXT_REPLIES')));
 		}
 		else
 		{
-			make_error(S_NOTALLOWED) if($file and !ALLOW_IMAGES);
-			make_error(S_NOTALLOWED) if(!$file and !ALLOW_TEXTONLY);
+			make_error(S_NOTALLOWED) if($file and !($board->option('ALLOW_IMAGES')));
+			make_error(S_NOTALLOWED) if(!$file and !($board->option('ALLOW_TEXTONLY')));
 		}
 	}
 	
 	if ($sticky && $parent)
 	{
-		my $stickyupdate=$dbh->prepare("UPDATE ".SQL_TABLE." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+		my $stickyupdate=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 		$stickyupdate->execute($parent, $parent) or make_error(S_SQLFAIL);
 	}
 	
@@ -353,7 +346,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	{
 		if ($parent)
 		{
-			my $lockupdate=$dbh->prepare("UPDATE ".SQL_TABLE." SET locked='yes' WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			my $lockupdate=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='yes' WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$lockupdate->execute($parent, $parent) or make_error(S_SQLFAIL);
 		}
 		$lock='yes';
@@ -367,10 +360,10 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	make_error(S_UNUSUAL) if($subject=~/[\n\r]/);
 
 	# check for excessive amounts of text
-	make_error(S_TOOLONG) if(length($name)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG) if(length($email)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG) if(length($subject)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG) if(length($comment)>MAX_COMMENT_LENGTH);
+	make_error(S_TOOLONG) if(length($name)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($email)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($subject)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($comment)>($board->option('MAX_COMMENT_LENGTH')));
 
 	# check to make sure the user selected a file, or clicked the checkbox
 	make_error(S_NOPIC) if(!$parent and !$file and !$nofile);
@@ -397,7 +390,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 
 	# process the tripcode - maybe the string should be decoded later
 	my $trip;
-	($name,$trip)=process_tripcode($name,TRIPKEY,SECRET,CHARSET);
+	($name,$trip)=process_tripcode($name,($board->option('TRIPKEY')),SECRET,CHARSET);
 
 	# check for bans
 	ban_check($numip,$c_name,$subject,$comment) unless $whitelisted;
@@ -405,16 +398,16 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	# spam check
 	spam_engine(
 		query=>$query,
-		trap_fields=>SPAM_TRAP?["name","link"]:[],
+		trap_fields=>$board->option('SPAM_TRAP')?["name","link"]:[],
 		spam_files=>[SPAM_FILES],
 		charset=>CHARSET,
 	) unless $whitelisted;
 
 	# check captcha
-	check_captcha($dbh,$captcha,$ip,$parent) if(ENABLE_CAPTCHA and !$no_captcha and !is_trusted($trip));
+	check_captcha($dbh,$captcha,$ip,$parent) if($board->option('ENABLE_CAPTCHA') and !$no_captcha and !is_trusted($trip));
 
 	# proxy check
-	proxy_check($ip) if (!$whitelisted and ENABLE_PROXY_CHECK);
+	proxy_check($ip) if (!$whitelisted and $board->option('ENABLE_PROXY_CHECK'));
 
 	# check if thread exists, and get lasthit value
 	my ($parent_res,$lasthit);
@@ -430,7 +423,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 
 
 	# kill the name if anonymous posting is being enforced
-	if(FORCED_ANON)
+	if($board->option('FORCED_ANON'))
 	{
 		$name='';
 		$trip='';
@@ -465,8 +458,8 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	# insert default values for empty fields
 	$parent=0 unless $parent;
 	$name=make_anonymous($ip,$time) unless $name or $trip;
-	$subject=S_ANOTITLE unless $subject;
-	$comment=S_ANOTEXT unless $comment;
+	$subject=$board->option('S_ANOTITLE') unless $subject;
+	$comment=$board->option('S_ANOTEXT') unless $comment;
 
 	# flood protection - must happen after inputs have been cleaned up
 	flood_check($numip,$time,$comment,$file,1);
@@ -476,8 +469,8 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	# generate date
 	my $date=make_date($time+8*3600,DATE_STYLE);
 
-	# generate ID code if enabled
-	$date.=' ID:'.make_id_code($ip,$time,$email) if(DISPLAY_ID);
+	# generate ID code if enabledg
+	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
 	# copy file, do checksums, make thumbnail, etc
 	my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$parent) if($file);
@@ -485,7 +478,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	$sticky = 0 if (!$sticky);
 	
 	# finally, write to the database
-	my $sth=$dbh->prepare("INSERT INTO ".SQL_TABLE." VALUES(null,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','',?,?,?);") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("INSERT INTO ".$board->option('SQL_TABLE')." VALUES(null,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','',?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute($parent,$time,$lasthit,$numip,
 	$date,$name,$trip,$email,$subject,$password,$comment,
 	$filename,$size,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$admin_post,$sticky,$lock) or make_error(S_SQLFAIL);
@@ -493,9 +486,9 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	if($parent) # bumping
 	{
 		# check for sage, or too many replies
-		unless($email=~/sage/i or sage_count($parent_res)>MAX_RES)
+		unless($email=~/sage/i or sage_count($parent_res)>$board->option('MAX_RES'))
 		{
-			$sth=$dbh->prepare("UPDATE ".SQL_TABLE." SET lasthit=$time WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET lasthit=$time WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$sth->execute($parent,$parent) or make_error(S_SQLFAIL);
 		}
 	}
@@ -512,12 +505,12 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	{
 		if($filename)
 		{
-			$sth=$dbh->prepare("SELECT num FROM ".SQL_TABLE." WHERE image=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE image=?;") or make_error(S_SQLFAIL);
 			$sth->execute($filename) or make_error(S_SQLFAIL);
 		}
 		else
 		{
-			$sth=$dbh->prepare("SELECT num FROM ".SQL_TABLE." WHERE timestamp=? AND comment=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE timestamp=? AND comment=?;") or make_error(S_SQLFAIL);
 			$sth->execute($time,$comment) or make_error(S_SQLFAIL);
 		}
 		my $num=($sth->fetchrow_array())[0];
@@ -525,7 +518,7 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 		if($num)
 		{
 			# add staff log entry
-			add_log_entry($username,'admin_post',SQL_TABLE.','.$num,$date,$numip,0) if($admin_post eq 'yes');
+			add_log_entry($username,'admin_post',$board->path().','.$num,$date,$numip,0) if($admin_post eq 'yes');
 			
 			build_thread_cache($num);
 			$parent = $num; # For use with "noko" below
@@ -534,34 +527,36 @@ sub post_stuff($$$$$$$$$$$$$$$$)
 	
 	# set the name, email and password cookies
 	make_cookies(name=>$c_name,email=>$c_email,password=>$c_password,
-	-charset=>CHARSET,-autopath=>COOKIE_PATH); # yum!
+	-charset=>CHARSET,-autopath=>$board->option('COOKIE_PATH')); # yum!
 
 	# forward back to the main page
-	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT) unless $noko;
+	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT) unless $noko;
 	
 	# ...unless we have "noko" (a la 4chan)--then forward to thread
 	# ($parent contains current post number if a new thread was posted)
-	make_http_forward(RES_DIR.$parent.PAGE_EXT,ALTERNATE_REDIRECT);
+	make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent.PAGE_EXT,ALTERNATE_REDIRECT);
 	
 	$sth->finish();
 }
 
-# Post Editing
+#
+# Editing
+#
 
-sub edit_window($$$) # ADDED subroutine for creating the post-edit window
+sub edit_window($$$$) # ADDED subroutine for creating the post-edit window
 {
-	my ($num, $password, $admin)=@_;
+	my ($num, $password, $admin, $admin_editing_mode)=@_;
 	my @loop;
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num=?;");
+	my $sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;");
 	$sth->execute($num);
-	check_password($admin, 1) if $admin;
+	check_password($admin, 'mpanel', 1) if $admin;
 
 	while (my $row = get_decoded_hashref($sth))
 	{
-		make_error(S_NOPASS,1) if ($$row{password} eq '' && !$admin);
-		make_error(S_BADEDITPASS,1) if ($$row{password} ne $password && !$admin);
-		make_error(S_THREADLOCKEDERROR,1) if ($$row{locked} eq 'yes' && !$admin);
-		make_error(S_WRONGPASS,1) if ($$row{admin_post} eq 'yes' && !$admin);
+		make_error(S_NOPASS,1) if ($$row{password} eq '' && !$admin_editing_mode);
+		make_error(S_BADEDITPASS,1) if ($$row{password} ne $password && !$admin_editing_mode);
+		make_error(S_THREADLOCKEDERROR,1) if ($$row{locked} eq 'yes' && !$admin_editing_mode);
+		make_error(S_WRONGPASS,1) if ($$row{admin_post} eq 'yes' && !$admin_editing_mode);
 		push @loop, $row;
 	}
 
@@ -569,18 +564,22 @@ sub edit_window($$$) # ADDED subroutine for creating the post-edit window
 	
 	return if (!@loop);
 	make_http_header();
-	print encode_string(POST_EDIT_TEMPLATE->(admin=>$admin, password=>$password, loop=>\@loop)); 
+	print encode_string(POST_EDIT_TEMPLATE->(admin=>$admin_editing_mode, password=>$password, loop=>\@loop, stylesheets=>get_stylesheets(),board=>$board)); 
 }
 
 sub tag_killa($) # subroutine for stripping HTML tags and supplanting them with corresponding wakabamark
 {
 	my $tag_killa = $_[0];
+	study $tag_killa; # Prepare string for some extensive regexp.
+
 	$tag_killa =~ s/<p><small><strong> Oekaki post<\/strong> \(Time\:.*?<\/small><\/p>//; # Strip Oekaki postfix.
 	$tag_killa =~ s/<p><small><strong> Edited in Oekaki<\/strong> \(Time\:.*?<\/small><\/p>//; # Strip Oekaki edit postfix
 	$tag_killa =~ s/<br\s?\/?>/\n/g;
 	$tag_killa =~ s/<\/p>$//;
 	$tag_killa =~ s/<\/p>/\n\n/g;
 	$tag_killa =~ s/<code>([^\n]*?)<\/code>/\`$1\`/g;
+	$tag_killa =~ s/<\/blockquote>$//;
+	$tag_killa =~ s/<\/blockquote>/\n\n/g;
 	while($tag_killa =~ m/<\s*?code>(.*?)<\/\s*?code>/s)
 	{
 		my $replace = $1; # String to substitute
@@ -631,42 +630,42 @@ sub password_window($$$)
 	make_http_header();
 	if ($type eq "edit")
 	{
-		print encode_string(PASSWORD->(num=>$num, admin_post=>$admin_post));
+		print encode_string(PASSWORD->(num=>$num, admin_post=>$admin_post, stylesheets=>get_stylesheets(), board=>$board));
 	} 
 	else # Deleting
 	{
-		print encode_string(DELPASSWORD->(num=>$num));
+		print encode_string(DELPASSWORD->(num=>$num, stylesheets=>get_stylesheets(), board=>$board));
 	}
 }
 	
 
-sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
+sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 {
-	my ($num,$name,$email,$subject,$comment,$file,$uploadname,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip)=@_;
+	my ($num,$name,$email,$subject,$comment,$file,$uploadname,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip,$admin_editing_mode)=@_;
 	# get a timestamp for future use
-	my $time=time();
+	my $time=time();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
 	
 	my $admin_post = '';
 			# Variable to declare whether this is an admin-edited post.
 			# (This is done to lock-out users from editing something edited by a mod.)
 	
 	# Grab original information from the target post
-	my $select=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num = ?;");
+	my $select=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num = ?;");
 	$select->execute($num);
 	
 	my $row = get_decoded_hashref($select);
 	
 	# check that the thread is not locked
-	make_error(S_THREADLOCKEDERROR,1) if ($$row{locked} eq 'yes' && !$admin);
+	make_error(S_THREADLOCKEDERROR,1) if ($$row{locked} eq 'yes' && !$admin_editing_mode);
 	
 	# check that the request came in as a POST, or from the command line
 	make_error(S_UNJUST,1) if($ENV{REQUEST_METHOD} and $ENV{REQUEST_METHOD} ne "POST");
 
 	my ($username,$accounttype);
-	if($admin) # check admin password - allow both encrypted and non-encrypted
+	if($admin_editing_mode) # check admin password - allow both encrypted and non-encrypted
 	{
-		($username, $accounttype) = check_password($admin, 1);
-		$admin_post = 'yes' unless $postfix;
+		($username, $accounttype) = check_password($admin, 'mpanel', 1);
+		$admin_post = 'yes';
 	}
 	else
 	{
@@ -682,11 +681,11 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 		# check what kind of posting is allowed
 		if($$row{parent})
 		{
-			make_error(S_NOTALLOWED,1) if($file and !ALLOW_IMAGE_REPLIES);
+			make_error(S_NOTALLOWED,1) if($file and !($board->option('ALLOW_IMAGE_REPLIES')));
 		}
 		else
 		{
-			make_error(S_NOTALLOWED,1) if($file and !ALLOW_IMAGES);
+			make_error(S_NOTALLOWED,1) if($file and !$board->option('ALLOW_IMAGES'));
 		}
 		
 		# Only staff can change management posts and edits
@@ -699,10 +698,10 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	make_error(S_UNUSUAL,1) if($subject=~/[\n\r]/);
 
 	# check for excessive amounts of text
-	make_error(S_TOOLONG,1) if(length($name)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG,1) if(length($email)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG,1) if(length($subject)>MAX_FIELD_LENGTH);
-	make_error(S_TOOLONG,1) if(length($comment)>MAX_COMMENT_LENGTH);
+	make_error(S_TOOLONG) if(length($name)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($email)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($subject)>($board->option('MAX_FIELD_LENGTH')));
+	make_error(S_TOOLONG) if(length($comment)>($board->option('MAX_COMMENT_LENGTH')));
 
 	# check for empty reply or empty text-only post
 	make_error(S_NOTEXT,1) if($comment=~/^\s*$/ and !$file and !$$row{filename});
@@ -726,7 +725,7 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 
 	# process the tripcode - maybe the string should be decoded later
 	my $trip;
-	($name,$trip)=process_tripcode($name,TRIPKEY,SECRET,CHARSET);
+	($name,$trip)=process_tripcode($name,$board->option('TRIPKEY'),SECRET,CHARSET);
 	$trip = '' if $killtrip;
 
 	# check for bans
@@ -735,19 +734,19 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# spam check
 	spam_engine(
 		query=>$query,
-		trap_fields=>SPAM_TRAP?["name","link"]:[],
+		trap_fields=>$board->option('SPAM_TRAP')?["name","link"]:[],
 		spam_files=>[SPAM_FILES],
 		charset=>CHARSET,
 	) unless $whitelisted;
 
 	# check captcha
-	check_captcha($dbh,$captcha,$ip,$$row{parent}) if(ENABLE_CAPTCHA and !$no_captcha and !is_trusted($trip));
+	check_captcha($dbh,$captcha,$ip,$$row{parent}) if($board->option('ENABLE_CAPTCHA') and !$no_captcha and !is_trusted($trip));
 
 	# proxy check
-	proxy_check($ip) if (!$whitelisted and ENABLE_PROXY_CHECK);
+	proxy_check($ip) if (!$whitelisted and $board->option('ENABLE_PROXY_CHECK'));
 
 	# kill the name if anonymous posting is being enforced
-	if(FORCED_ANON)
+	if($board->option('FORCED_ANON'))
 	{
 		$name='';
 		$trip='';
@@ -766,16 +765,16 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	$comment=format_comment(clean_string(decode_string($comment,CHARSET))) unless $no_format;
 	
 	# check for past oekaki postfix and attach it to the current comment if necessary
-	if (!$postfix && !$admin && !$file)
+	if (!$postfix && !$admin_editing_mode && !$file)
 	{
-		if ($$row{comment} =~ m/(<p><small><strong> Oekaki post<\/strong> \(Time\:.*?<\/small><\/p>)/)
+		if ($$row{comment} =~ m/(<p><small><strong>\s*(Oekaki post|Edited in Oekaki)\s*<\/strong> \(Time\:.*?<\/small><\/p>)/)
 		{
 			$comment.=$1;
 		}
 	}
 	elsif ($file && $postfix)
 	{
-		if ($$row{comment} =~ m/(<p><small><strong> Oekaki post<\/strong> \(Time\:.*?<\/small><\/p>)/)
+		if ($$row{comment} =~ m/(<p><small><strong>\s*Oekaki post\s*<\/strong> \(Time\:.*?<\/small><\/p>)/)
 		{
 			my $oekaki_original = $1;
 			$oekaki_original =~ s/<\/small><\/p>//;
@@ -786,13 +785,13 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	}
 	else
 	{
-		$comment.=$postfix;
+		$comment.=$postfix; # If there is a file and no postfix, then we'll attach the empty variable
 	}
 
 	# insert default values for empty fields
 	$name=make_anonymous($ip,$time) unless $name or $trip;
-	$subject=S_ANOTITLE unless $subject;
-	$comment=S_ANOTEXT unless $comment;
+	$subject=$board->option('S_ANOTITLE') unless $subject;
+	$comment=$board->option('S_ANOTEXT') unless $comment;
 
 	# flood protection - must happen after inputs have been cleaned up
 	flood_check($numip,$time,$comment,$file,0);
@@ -803,18 +802,18 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	my $date=make_date($time+8*3600,DATE_STYLE);
 
 	# generate ID code if enabled
-	$date.=' ID:'.make_id_code($ip,$time,$email) if(DISPLAY_ID);
+	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
 	# copy file, do checksums, make thumbnail, etc
 	 if($file)
 	 {
 		 my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
-		 my $filesth=$dbh->prepare("UPDATE ".SQL_TABLE." SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=? WHERE num=?")
+		 my $filesth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=? WHERE num=?")
 		 	or make_error(S_SQLFAIL,1);
 		 $filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height, $num) or make_error(S_SQLFAIL);
 		 # now delete original files
 		 if ($$row{image} ne '') { unlink $$row{image}; }
-		 my $thumb=THUMB_DIR;
+		 my $thumb=$board->path.'/'.$board->option('THUMB_DIR');
 		 if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
 	 }
 	
@@ -822,7 +821,7 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	$select->finish(); 
 	
 	# finally, write to the database
-	my $sth=$dbh->prepare("UPDATE ".SQL_TABLE." SET name=?,trip=?,subject=?,email=?,comment=?,lastedit=?,lastedit_ip=?,admin_post=? WHERE num=?;") or make_error(S_SQLFAIL,1);
+	my $sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET name=?,trip=?,subject=?,email=?,comment=?,lastedit=?,lastedit_ip=?,admin_post=? WHERE num=?;") or make_error(S_SQLFAIL,1);
 	$sth->execute($name,($trip || $killtrip) ? $trip : $$row{trip},$subject,$email,$comment,$date,$numip,$admin_post,$num) or make_error(S_SQLFAIL,1);
 
 	# remove old threads from the database
@@ -841,24 +840,30 @@ sub edit_shit($$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	$sth->finish();
 	
 	# add staff log entry, if needed
-	add_log_entry($username,'admin_edit',SQL_TABLE.','.$num,$date,$numip,0) if($admin_post eq 'yes');
+	add_log_entry($username,'admin_edit',$board->path().','.$num,$date,$numip,0) if($admin_post eq 'yes');
 
 	# redirect to confirmation page
 	make_http_header();
-	print encode_string(EDIT_SUCCESSFUL->()); 
+	print encode_string(EDIT_SUCCESSFUL->(stylesheets=>get_stylesheets(),board=>$board)); 
 }
+
+#
+# Thread Management
+#
 
 sub sticky($$)
 {
 	my ($num, $admin) = @_;
-	my ($username, $type) = check_password($admin);
-	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".SQL_TABLE." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my ($username, $type) = check_password($admin, 'mpanel');
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
+
+	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_ALREADYSTICKIED) if $$row{stickied}; 
-		my $update=$dbh->prepare("UPDATE ".SQL_TABLE." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
 	else
@@ -868,24 +873,26 @@ sub sticky($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_sticky',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_sticky',$board->path().','.$num,make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
-	make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 sub unsticky($$)
 {
 	my ($num, $admin) = @_;
-	my ($username, $type) = check_password($admin);
-	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".SQL_TABLE." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my ($username, $type) = check_password($admin, 'mpanel');
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
+	
+	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_NOTSTICKIED) if !$$row{stickied}; 
-		my $update=$dbh->prepare("UPDATE ".SQL_TABLE." SET stickied=0 WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=0 WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -896,24 +903,26 @@ sub unsticky($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_unsticky',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_unsticky',$board->path().','.$num,make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
-	make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 sub lock_thread($$)
 {
 	my ($num, $admin) = @_;
-	my ($username, $type) = check_password($admin);
-	my $sth=$dbh->prepare("SELECT parent, locked FROM ".SQL_TABLE." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my ($username, $type) = check_password($admin, 'mpanel');
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
+	
+	my $sth=$dbh->prepare("SELECT parent, locked FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_ALREADYLOCKED) if ($$row{locked} eq 'yes');
-		my $update=$dbh->prepare("UPDATE ".SQL_TABLE." SET locked='yes' WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='yes' WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -924,25 +933,27 @@ sub lock_thread($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_lock',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_lock',$board->path().','.$num,make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
-	make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 sub unlock_thread($$)
 {
 	my ($num, $admin) = @_;
-	my ($username, $type) = check_password($admin);
-	my $sth=$dbh->prepare("SELECT parent, locked FROM ".SQL_TABLE." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my ($username, $type) = check_password($admin, 'mpanel');
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
+	
+	my $sth=$dbh->prepare("SELECT parent, locked FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 
 	if (!$$row{parent})
 	{
 		make_error("String Already Unlocked.") if ($$row{locked} ne 'yes');
-		my $update=$dbh->prepare("UPDATE ".SQL_TABLE." SET locked='' WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='' WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -953,12 +964,16 @@ sub unlock_thread($$)
 	
 	$sth->finish();
 	
-	add_log_entry($username,'thread_unlock',SQL_TABLE.','.$num,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
+	add_log_entry($username,'thread_unlock',$board->path().','.$num,make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0);
 	
 	build_thread_cache($num);
 	build_cache();
-	make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT);
 }
+
+#
+# Ban/Whitelist Checking
+#
 
 sub is_whitelisted($)
 {
@@ -1008,7 +1023,7 @@ sub ban_check($$$$)
 	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
 	$sth->execute($numip) or make_error(S_SQLFAIL);
 
-	host_is_banned($numip) if (($sth->fetchrow_array())[0]); # EDITED FROM make_error(S_BADHOST) if(($sth->fetchrow_array())[0]);
+	host_is_banned($numip) if (($sth->fetchrow_array())[0]);
 
 # fucking mysql...
 #	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='wordban' AND ? LIKE '%' || sval1 || '%';") or make_error(S_SQLFAIL);
@@ -1023,9 +1038,9 @@ sub ban_check($$$$)
 	while($row=$sth->fetchrow_arrayref())
 	{
 		my $regexp=quotemeta $$row[0];
-		$badstring = 1 if($comment=~/$regexp/);
-		$badstring = 1 if($name=~/$regexp/);
-		$badstring = 1 if($subject=~/$regexp/);
+		$badstring = 1 if($comment=~/$regexp/i);
+		$badstring = 1 if($name=~/$regexp/i);
+		$badstring = 1 if($subject=~/$regexp/i);
 	}
 	
 	$sth->finish();
@@ -1086,10 +1101,10 @@ sub host_is_banned($) # subroutine for handling bans
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
 
-sub admin_is_banned($)
+sub admin_is_banned($$)
 {
 	my ($numip, $admin) = @_;
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, '');
 	remove_ban_on_admin($admin) and next if ($type eq 'admin'); # Remove ban, go back to start of FastCGI loop.
 
 	make_error("Access denied due to banned host.");
@@ -1097,6 +1112,10 @@ sub admin_is_banned($)
 	last if $count > $maximum_allowed_loops;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
+
+#
+# Flood Checking
+#
 
 sub flood_check($$$$$)
 {
@@ -1106,24 +1125,24 @@ sub flood_check($$$$$)
 	if($file)
 	{
 		# check for to quick file posts
-		$maxtime=$time-(RENZOKU2);
-		$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE ip=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+		$maxtime=$time-($board->option('RENZOKU2'));
+		$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE ip=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 		$sth->execute($ip) or make_error(S_SQLFAIL);
 		make_error(S_RENZOKU2) if(($sth->fetchrow_array())[0]);
 	}
 	else
 	{
 		# check for too quick replies or text-only posts
-		$maxtime=$time-(RENZOKU);
-		$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE ip=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+		$maxtime=$time-($board->option('RENZOKU'));
+		$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE ip=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 		$sth->execute($ip) or make_error(S_SQLFAIL);
 		make_error(S_RENZOKU) if(($sth->fetchrow_array())[0]);
 
 		# check for repeated messages
 		if ($repeat_ok) # If the post is being edited, the comment field does not have to change.
 		{
-			$maxtime=$time-(RENZOKU3);
-			$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE ip=? AND comment=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+			$maxtime=$time-($board->option('RENZOKU3'));
+			$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE ip=? AND comment=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 			$sth->execute($ip,$comment) or make_error(S_SQLFAIL);
 			make_error(S_RENZOKU3) if(($sth->fetchrow_array())[0]);
 		}
@@ -1132,6 +1151,10 @@ sub flood_check($$$$$)
 	$sth->finish();
 	
 }
+
+#
+# Proxy Checking
+#
 
 sub proxy_check($)
 {
@@ -1160,7 +1183,7 @@ sub proxy_check($)
 	}
 	else
 	{	# unknown IP, check for proxy
-		my $command = PROXY_COMMAND . " " . $ip;
+		my $command = $board->option('PROXY_COMMAND') . " " . $ip;
 		$sth=$dbh->prepare("INSERT INTO ".SQL_PROXY_TABLE." VALUES(null,?,?,?,?);") or make_error(S_SQLFAIL);
 
 		if(`$command`)
@@ -1183,7 +1206,7 @@ sub add_proxy_entry($$$$$)
 	my ($admin,$type,$ip,$timestamp,$date)=@_;
 	my ($sth);
 
-	check_password($admin);
+	check_password($admin, 'proxy');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1193,11 +1216,11 @@ sub add_proxy_entry($$$$$)
 		make_error(S_BADIP);
 	}
 	if ($type == 'white') { 
-		$timestamp = $timestamp - PROXY_WHITE_AGE + time(); 
+		$timestamp = $timestamp - $board->option('PROXY_WHITE_AGE') + time(); 
 	}
 	else
 	{
-		$timestamp = $timestamp - PROXY_BLACK_AGE + time(); 
+		$timestamp = $timestamp - $board->option('PROXY_BLACK_AGE') + time(); 
 	}	
 
 	# This is to ensure user doesn't put multiple entries for the same IP
@@ -1209,26 +1232,26 @@ sub add_proxy_entry($$$$$)
 	$sth->execute($type,$ip,$timestamp,$date) or make_error(S_SQLFAIL);
 	$sth->finish();
 
-        make_http_forward(get_secure_script_name()."?task=proxy",ALTERNATE_REDIRECT);
+        make_http_forward(get_secure_script_name()."?task=proxy&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 sub proxy_clean()
 {
 	my ($sth,$timestamp);
 
-	if(PROXY_BLACK_AGE == PROXY_WHITE_AGE)
+	if($board->option('PROXY_BLACK_AGE') == $board->option('PROXY_WHITE_AGE'))
 	{
-		$timestamp = time() - PROXY_BLACK_AGE;
+		$timestamp = time() - $board->option('PROXY_BLACK_AGE');
 		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 	} 
 	else
 	{
-		$timestamp = time() - PROXY_BLACK_AGE;
+		$timestamp = time() - $board->option('PROXY_BLACK_AGE');
 		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE type='black' AND timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 
-		$timestamp = time() - PROXY_WHITE_AGE;
+		$timestamp = time() - $board->option('PROXY_WHITE_AGE');
 		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE type='white' AND timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 	}
@@ -1241,7 +1264,7 @@ sub remove_proxy_entry($$)
 	my ($admin,$num)=@_;
 	my ($sth);
 
-	check_password($admin);
+	check_password($admin, 'proxy');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1250,8 +1273,12 @@ sub remove_proxy_entry($$)
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	$sth->finish();
 
-	make_http_forward(get_secure_script_name()."?task=proxy",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=proxy&board=".$board->path(),ALTERNATE_REDIRECT);
 }
+
+#
+# String Formatting
+#
 
 sub format_comment($)
 {
@@ -1273,7 +1300,7 @@ sub format_comment($)
 		return $line;
 	};
 
-	if(ENABLE_WAKABAMARK) { $comment=do_wakabamark($comment,$handler) }
+	if($board->option('ENABLE_WAKABAMARK')) { $comment=do_wakabamark($comment,$handler) }
 	else { $comment="<p>".simple_format($comment,$handler)."</p>" }
 
 	# fix <blockquote> styles for old stylesheets
@@ -1296,7 +1323,7 @@ sub simple_format($@)
 		$line=~s{(https?://[^\s<>"]*?)((?:\s|<|>|"|\.|\)|\]|!|\?|,|&#44;|&quot;)*(?:[\s<>"]|$))}{\<a href="$1"\>$1\</a\>$2}sgi;
 
 		# colour quoted sections if working in old-style mode.
-		$line=~s!^(&gt;[^_]*)$!\<span class="unkfunc"\>$1\</span\>!g unless(ENABLE_WAKABAMARK);
+		$line=~s!^(&gt;[^_]*)$!\<span class="unkfunc"\>$1\</span\>!g unless($board->option('ENABLE_WAKABAMARK'));
 
 		$line=$handler->($line) if($handler);
 
@@ -1316,11 +1343,11 @@ sub make_anonymous($$)
 {
 	my ($ip,$time)=@_;
 
-	return S_ANONAME unless(SILLY_ANONYMOUS);
+	return $board->option('S_ANONAME') unless($board->option('SILLY_ANONYMOUS'));
 
 	my $string=$ip;
-	$string.=",".int($time/86400) if(SILLY_ANONYMOUS=~/day/i);
-	$string.=",".$ENV{SCRIPT_NAME} if(SILLY_ANONYMOUS=~/board/i);
+	$string.=",".int($time/86400) if($board->option('SILLY_ANONYMOUS')=~/day/i);
+	$string.=",".$ENV{SCRIPT_NAME} if($board->option('SILLY_ANONYMOUS')=~/board/i);
 
 	srand unpack "N",hide_data($string,4,"silly",SECRET);
 
@@ -1341,27 +1368,31 @@ sub make_id_code($$$)
 {
 	my ($ip,$time,$link)=@_;
 
-	return EMAIL_ID if($link and DISPLAY_ID=~/link/i);
-	return EMAIL_ID if($link=~/sage/i and DISPLAY_ID=~/sage/i);
+	return $board->option('EMAIL_ID') if($link and $board->option('DISPLAY_ID')=~/link/i);
+	return $board->option('EMAIL_ID') if($link=~/sage/i and $board->option('DISPLAY_ID')=~/sage/i);
 
-	return resolve_host($ENV{REMOTE_ADDR}) if(DISPLAY_ID=~/host/i);
-	return $ENV{REMOTE_ADDR} if(DISPLAY_ID=~/ip/i);
+	return resolve_host($ENV{REMOTE_ADDR}) if($board->option('DISPLAY_ID')=~/host/i);
+	return $ENV{REMOTE_ADDR} if($board->option('DISPLAY_ID')=~/ip/i);
 
 	my $string="";
-	$string.=",".int($time/86400) if(DISPLAY_ID=~/day/i);
-	$string.=",".$ENV{SCRIPT_NAME} if(DISPLAY_ID=~/board/i);
+	$string.=",".int($time/86400) if($board->option('DISPLAY_ID')=~/day/i);
+	$string.=",".$ENV{SCRIPT_NAME} if($board->option('DISPLAY_ID')=~/board/i);
 
-	return mask_ip($ENV{REMOTE_ADDR},make_key("mask",SECRET,32).$string) if(DISPLAY_ID=~/mask/i);
+	return mask_ip($ENV{REMOTE_ADDR},make_key("mask",SECRET,32).$string) if($board->option('DISPLAY_ID')=~/mask/i);
 
 	return hide_data($ip.$string,6,"id",SECRET,1);
 }
+
+#
+# Post Lookup
+#
 
 sub get_post($)
 {
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = $sth->fetchrow_hashref();
 	$sth->finish();
@@ -1374,7 +1405,7 @@ sub get_parent_post($)
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = $sth->fetchrow_hashref();
 	$sth->finish();
@@ -1387,13 +1418,17 @@ sub sage_count($)
 	my ($parent)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE parent=? AND NOT ( timestamp<? AND ip=? );") or make_error(S_SQLFAIL);
-	$sth->execute($$parent{num},$$parent{timestamp}+(NOSAGE_WINDOW),$$parent{ip}) or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE parent=? AND NOT ( timestamp<? AND ip=? );") or make_error(S_SQLFAIL);
+	$sth->execute($$parent{num},$$parent{timestamp}+($board->option('NOSAGE_WINDOW')),$$parent{ip}) or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
 
 	return $return;
 }
+
+#
+# Upload Processing
+#
 
 sub get_file_size($)
 {
@@ -1403,7 +1438,7 @@ sub get_file_size($)
 	@filestats=stat $file;
 	$size=$filestats[7];
 
-	make_error(S_TOOBIG) if($size>MAX_KB*1024);
+	make_error(S_TOOBIG) if($size>($board->option('MAX_KB'))*1024);
 	make_error(S_TOOBIGORNONE) if($size==0); # check for small files, too?
 
 	return($size);
@@ -1412,7 +1447,7 @@ sub get_file_size($)
 sub process_file($$$$)
 {
 	my ($file,$uploadname,$time,$parent)=@_;
-	my %filetypes=FILETYPES;
+	my %filetypes=$board->option('FILETYPES');
 
 	# make sure to read file in binary mode on platforms that care about such things
 	binmode $file;
@@ -1422,17 +1457,17 @@ sub process_file($$$$)
 
 	my $known=($width or $filetypes{$ext});
 
-	make_error(S_BADFORMAT) unless(ALLOW_UNKNOWN or $known);
-	make_error(S_BADFORMAT) if(grep { $_ eq $ext } FORBIDDEN_EXTENSIONS);
-	make_error(S_TOOBIG) if(MAX_IMAGE_WIDTH and $width>MAX_IMAGE_WIDTH);
-	make_error(S_TOOBIG) if(MAX_IMAGE_HEIGHT and $height>MAX_IMAGE_HEIGHT);
-	make_error(S_TOOBIG) if(MAX_IMAGE_PIXELS and $width*$height>MAX_IMAGE_PIXELS);
+	make_error(S_BADFORMAT) unless($board->option('ALLOW_UNKNOWN') or $known);
+	make_error(S_BADFORMAT) if(grep { $_ eq $ext } $board->option('FORBIDDEN_EXTENSIONS'));
+	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_WIDTH') and $width>($board->option('MAX_IMAGE_WIDTH')));
+	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_HEIGHT') and $height>($board->option('MAX_IMAGE_HEIGHT')));
+	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_PIXELS') and $width*$height>($board->option('MAX_IMAGE_PIXELS')));
 
 	# generate random filename - fudges the microseconds
 	my $filebase=$time.sprintf("%03d",int(rand(1000)));
-	my $filename=IMG_DIR.$filebase.'.'.$ext;
-	my $thumbnail=THUMB_DIR.$filebase."s.jpg";
-	$filename.=MUNGE_UNKNOWN unless($known);
+	my $filename=$board->path.'/'.$board->option('IMG_DIR').$filebase.'.'.$ext;
+	my $thumbnail=$board->path.'/'.$board->option('THUMB_DIR').$filebase."s.jpg";
+	$filename.=$board->option('MUNGE_UNKNOWN') unless($known);
 
 	# do copying and MD5 checksum
 	my ($md5,$md5ctx,$buffer);
@@ -1462,11 +1497,21 @@ sub process_file($$$$)
 		($md5)=$md5sum=~/^([0-9a-f]+)/ unless($?);
 	}
 
-	if($md5 && $parent && (!defined(&DUPE_CHECK) || &DUPE_CHECK) ) # if we managed to generate an md5 checksum, check for duplicate files in the same thread
+	if($md5 && (($parent && $board->option('DUPLICATE_DETECTION') eq 'thread') || $board->option('DUPLICATE_DETECTION') eq 'board')) # if we managed to generate an md5 checksum, check for duplicate files
 	{
-		my $sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE md5=? AND (parent=? OR num=?);") or make_error(S_SQLFAIL);
-		$sth->execute($md5, $parent, $parent) or make_error(S_SQLFAIL);
-
+		my $sth;
+		
+		if ($board->option('DUPLICATE_DETECTION') eq 'thread') # Check dupes in same thread
+		{
+			$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE md5=? AND (parent=? OR num=?);") or make_error(S_SQLFAIL);
+			$sth->execute($md5, $parent, $parent) or make_error(S_SQLFAIL);
+		}
+		else # Check dupes throughout board
+		{
+			$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE md5=?;") or make_error(S_SQLFAIL);
+			$sth->execute($md5) or make_error(S_SQLFAIL);
+		}
+		
 		if(my $match=$sth->fetchrow_hashref())
 		{
 			unlink $filename; # make sure to remove the file
@@ -1483,7 +1528,7 @@ sub process_file($$$$)
 	{
 		if($filetypes{$ext}) # externally defined filetype
 		{
-			open THUMBNAIL,$filetypes{$ext};
+			open THUMBNAIL,$board->path().'/'.$filetypes{$ext};
 			binmode THUMBNAIL;
 			($tn_ext,$tn_width,$tn_height)=analyze_image(\*THUMBNAIL,$filetypes{$ext});
 			close THUMBNAIL;
@@ -1497,29 +1542,29 @@ sub process_file($$$$)
 			$thumbnail=undef;
 		}
 	}
-	elsif($width>MAX_W or $height>MAX_H or THUMBNAIL_SMALL)
+	elsif($width>($board->option('MAX_W')) or $height>($board->option('MAX_H')) or $board->option('THUMBNAIL_SMALL'))
 	{
-		if($width<=MAX_W and $height<=MAX_H)
+		if($width<=($board->option('MAX_W')) and $height<=($board->option('MAX_H')))
 		{
 			$tn_width=$width;
 			$tn_height=$height;
 		}
 		else
 		{
-			$tn_width=MAX_W;
-			$tn_height=int(($height*(MAX_W))/$width);
+			$tn_width=$board->option('MAX_W');
+			$tn_height=int(($height*($board->option('MAX_W')))/$width);
 
-			if($tn_height>MAX_H)
+			if($tn_height>($board->option('MAX_H')))
 			{
-				$tn_width=int(($width*(MAX_H))/$height);
-				$tn_height=MAX_H;
+				$tn_width=int(($width*($board->option('MAX_H')))/$height);
+				$tn_height=$board->option('MAX_H');
 			}
 		}
 
-		if(STUPID_THUMBNAILING) { $thumbnail=$filename }
+		if($board->option('STUPID_THUMBNAILING')) { $thumbnail=$filename }
 		else
 		{
-			$thumbnail=undef unless(make_thumbnail($filename,$thumbnail,$tn_width,$tn_height,THUMBNAIL_QUALITY,CONVERT_COMMAND));
+			$thumbnail=undef unless(make_thumbnail($filename,$thumbnail,$tn_width,$tn_height,$board->option('THUMBNAIL_QUALITY'),$board->option('CONVERT_COMMAND')));
 		}
 	}
 	else
@@ -1533,7 +1578,7 @@ sub process_file($$$$)
 	{
 		my $newfilename=$uploadname;
 		$newfilename=~s!^.*[\\/]!!; # cut off any directory in filename
-		$newfilename=IMG_DIR.$newfilename;
+		$newfilename=$board->option('IMG_DIR').$newfilename;
 
 		unless(-e $newfilename) # verify no name clash
 		{
@@ -1548,113 +1593,116 @@ sub process_file($$$$)
 		}
 	}
 
-        if(ENABLE_LOAD)
+        if($board->option('ENABLE_LOAD'))
         {       # only called if files to be distributed across web     
                 $ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
 		my $root=$1;
-                system(LOAD_SENDER_SCRIPT." $filename $root $md5 &");
+                system($board->option('LOAD_SENDER_SCRIPT')." $filename $root $md5 &");
         }
 	
 	chmod 0644, $filename; # Make file world-readable
 	chmod 0644, $thumbnail if defined($thumbnail); # Make thumbnail (if any) world-readable
-
+	
+	my $board_path = $board->path(); # Clear out the board path name.
+	$filename =~ s/^${board_path}\///;
+	$thumbnail =~ s/^${board_path}\///;
+	
 	return ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height);
 }
-
-
 
 #
 # Deleting
 #
 
-sub delete_stuff($$$$$@)
+sub delete_stuff($$$$$$@)
 {
-	my ($password,$fileonly,$archive,$admin,$fromwindow,@posts)=@_;
+	my ($password,$fileonly,$archive,$admin,$admin_deletion_mode,$fromwindow,@posts)=@_;
 	my ($username, $type,$post,$ip);
 
-	if($admin)
+	if($admin_deletion_mode)
 	{
+		($username, $type) = check_password($admin, 'mpanel');
 		ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
-		($username, $type) = check_password($admin);
 	}
 	
 	make_error(S_BADDELPASS) unless($password or $admin); # refuse empty password immediately
 
 	# no password means delete always
-	$password="" if($admin); 
+	$password="" if($admin_deletion_mode); 
 
 	foreach $post (@posts)
 	{
 		$ip = delete_post($post,$password,$fileonly,$archive);
-		add_log_entry($username,'admin_delete',SQL_TABLE.','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin && $ip);
+		add_log_entry($username,'admin_delete',$board->path().','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0) if($admin_deletion_mode && $ip);
 	}
 	
 	# update the cached HTML pages
 	build_cache();
 
-	if($admin)
-	{ make_http_forward(get_secure_script_name()."?task=mpanel",ALTERNATE_REDIRECT); }
+	if($admin_deletion_mode)
+	{ make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT); }
 	elsif ($fromwindow && $ip)
-	{ make_http_header(); print encode_string(EDIT_SUCCESSFUL->());  }
+	{ make_http_header(); print encode_string(EDIT_SUCCESSFUL->(stylesheets=>get_stylesheets(),board=>$board));  }
 	elsif (!$fromwindow)
-	{ make_http_forward(HTML_SELF,ALTERNATE_REDIRECT); }
+	{ make_http_forward($board->path.'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT); }
 }
 
 sub delete_post($$$$)
 {
 	my ($post,$password,$fileonly,$archiving)=@_;
 	my ($sth,$row,$res,$reply);
-	my $thumb=THUMB_DIR;
-	my $archive=ARCHIVE_DIR;
-	my $src=IMG_DIR;
+	my $thumb=$board->option('THUMB_DIR');
+	my $archive=$board->option('ARCHIVE_DIR');
+	my $src=$board->option('IMG_DIR');
 	my $postinfo;
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($post) or make_error(S_SQLFAIL);
 
 	if($row=$sth->fetchrow_hashref())
 	{
 		make_error(S_BADDELPASS) if($password and $$row{password} ne $password);
+		make_error("This was posted by a moderator or admin and cannot be deleted this way.") if ($password and $$row{admin_post} eq 'yes');
 
 		unless($fileonly)
 		{
 			# remove files from comment and possible replies
-			$sth=$dbh->prepare("SELECT image,thumbnail FROM ".SQL_TABLE." WHERE num=? OR parent=?") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT image,thumbnail FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=?") or make_error(S_SQLFAIL);
 			$sth->execute($post,$post) or make_error(S_SQLFAIL);
 
 			while($res=$sth->fetchrow_hashref())
 			{
-				system(LOAD_SENDER_SCRIPT." $$res{image} &") if(ENABLE_LOAD);
+				system($board->path.'/'.$board->option('LOAD_SENDER_SCRIPT')." $$res{image} &") if($board->option('ENABLE_LOAD'));
 	
 				if($archiving)
 				{
 					# archive images
-					rename $$res{image}, ARCHIVE_DIR.$$res{image};
-					rename $$res{thumbnail}, ARCHIVE_DIR.$$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
+					rename $board->path.'/'.$$res{image}, $board->path.'/'.$board->option('ARCHIVE_DIR').$$res{image};
+					rename $board->path.'/'.$$res{thumbnail}, $board->path.'/'.$board->option('ARCHIVE_DIR').$$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
 				}
 				else
 				{
 					# delete images if they exist
-					unlink $$res{image};
-					unlink $$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
+					unlink $board->path.'/'.$$res{image};
+					unlink $board->path.'/'.$$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
 				}
 			}
 
 			# remove post and possible replies
-			$sth=$dbh->prepare("DELETE FROM ".SQL_TABLE." WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("DELETE FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$sth->execute($post,$post) or make_error(S_SQLFAIL);
 		}
 		else # remove just the image and update the database
 		{
 			if($$row{image})
 			{
-				system(LOAD_SENDER_SCRIPT." $$row{image} &") if(ENABLE_LOAD);
+				system($board->path.'/'.$board->option('LOAD_SENDER_SCRIPT')." $$row{image} &") if($board->option('ENABLE_LOAD'));
 
 				# remove images
-				unlink $$row{image};
-				unlink $$row{thumbnail} if($$row{thumbnail}=~/^$thumb/);
+				unlink $board->path.'/'.$$row{image};
+				unlink $board->path.'/'.$$row{thumbnail} if($$row{thumbnail}=~/^$thumb/);
 
-				$sth=$dbh->prepare("UPDATE ".SQL_TABLE." SET size=0,md5=null,thumbnail=null WHERE num=?;") or make_error(S_SQLFAIL);
+				$sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET size=0,md5=null,thumbnail=null WHERE num=?;") or make_error(S_SQLFAIL);
 				$sth->execute($post) or make_error(S_SQLFAIL);
 			}
 		}
@@ -1666,30 +1714,30 @@ sub delete_post($$$$)
 			{
 				if($archiving)
 				{
-					my $captcha = CAPTCHA_SCRIPT;
+					my $captcha = $board->option('CAPTCHA_SCRIPT');
 					my $line;
 
-					open RESIN, '<', RES_DIR.$$row{num}.PAGE_EXT;
-					open RESOUT, '>', ARCHIVE_DIR.RES_DIR.$$row{num}.PAGE_EXT;
+					open RESIN, '<', $board->path.'/'.$board->option('RES_DIR').$$row{num}.PAGE_EXT;
+					open RESOUT, '>', $board->path.'/'.$board->option('ARCHIVE_DIR').$board->option('RES_DIR').$$row{num}.PAGE_EXT;
 					while($line = <RESIN>)
 					{
 						$line =~ s/img src="(.*?)$thumb/img src="$1$archive$thumb/g;
-						if(ENABLE_LOAD)
+						if($board->option('ENABLE_LOAD'))
 						{
-							my $redir = REDIR_DIR;
+							my $redir = $board->path.'/'.$board->option('REDIR_DIR');
 							$line =~ s/href="(.*?)$redir(.*?).html/href="$1$archive$src$2/g;
 						}
 						else
 						{
 							$line =~ s/href="(.*?)$src/href="$1$archive$src/g;
 						}
-						$line =~ s/src="[^"]*$captcha[^"]*"/src=""/g if(ENABLE_CAPTCHA);
+						$line =~ s/src="[^"]*$captcha[^"]*"/src=""/g if($board->option('ENABLE_CAPTCHA'));
 						print RESOUT $line;	
 					}
 					close RESIN;
 					close RESOUT;
 				}
-				unlink RES_DIR.$$row{num}.PAGE_EXT;
+				unlink $board->path.'/'.$board->option('RES_DIR').$$row{num}.PAGE_EXT;
 			}
 			else # removing parent image
 			{
@@ -1708,16 +1756,15 @@ sub delete_post($$$$)
 	return $postinfo;
 }
 
-
-
 #
 # Admin interface
 #
 
-sub make_admin_login()
+sub make_admin_login(;$)
 {
+	my ($login_task) = @_;
 	make_http_header();
-	print encode_string(ADMIN_LOGIN_TEMPLATE->());
+	print encode_string(ADMIN_LOGIN_TEMPLATE->(login_task=>$login_task,stylesheets=>get_stylesheets(),board=>$board));
 }
 
 sub make_admin_post_panel($)
@@ -1725,12 +1772,12 @@ sub make_admin_post_panel($)
 	my ($admin)=@_;
 	my ($sth,$row,@posts,$size,$rowtype);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'mpost');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	$sth=$dbh->prepare("SELECT ".SQL_TABLE.".*, ".SQL_STAFFLOG_TABLE.".username FROM ".SQL_TABLE." LEFT OUTER JOIN ".SQL_STAFFLOG_TABLE." ON ".SQL_STAFFLOG_TABLE.".info=CONCAT('".SQL_TABLE.",',".SQL_TABLE.".num) AND ".SQL_STAFFLOG_TABLE.".action='admin_post' ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN ".SQL_TABLE.".num ELSE parent END ASC, ".SQL_TABLE.".num ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT ".$board->option('SQL_TABLE').".*, ".SQL_STAFFLOG_TABLE.".username FROM ".$board->option('SQL_TABLE')." LEFT OUTER JOIN ".SQL_STAFFLOG_TABLE." ON ".SQL_STAFFLOG_TABLE.".info=CONCAT('".$board->option('SQL_TABLE').",',".$board->option('SQL_TABLE').".num) AND ".SQL_STAFFLOG_TABLE.".action='admin_post' ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN ".$board->option('SQL_TABLE').".num ELSE parent END ASC, ".$board->option('SQL_TABLE').".num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	$size=0;
@@ -1749,7 +1796,7 @@ sub make_admin_post_panel($)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(POST_PANEL_TEMPLATE->(admin=>$admin,posts=>\@posts,size=>$size,username=>$username,type=>$type));
+	print encode_string(POST_PANEL_TEMPLATE->(admin=>$admin,board=>$board,posts=>\@posts,size=>$size,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board));
 }
 
 sub make_admin_ban_panel($$)
@@ -1757,7 +1804,7 @@ sub make_admin_ban_panel($$)
 	my ($admin, $ip)=@_;
 	my ($sth,$row,@bans,$prevtype);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'bans');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1777,14 +1824,14 @@ sub make_admin_ban_panel($$)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(BAN_PANEL_TEMPLATE->(admin=>$admin,bans=>\@bans,ip=>$ip,username=>$username,type=>$type));
+	print encode_string(BAN_PANEL_TEMPLATE->(admin=>$admin,bans=>\@bans,ip=>$ip,username=>$username,type=>$type, stylesheets=>get_stylesheets(),board=>$board));
 }
 
 sub make_admin_ban_edit($$) # generating ban editing window
 {
 	my ($admin, $num) = @_;
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'bans');
 
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1804,12 +1851,9 @@ sub make_admin_ban_edit($$) # generating ban editing window
 		{
 			@utctime = gmtime(time);
 		}
-			
-		$utctime[5] += 1900;
-		$utctime[4]++;
 	}
 	make_http_header();
-	print encode_string(EDIT_WINDOW->(admin=>$admin, hash=>\@hash, sec=>$utctime[0], min=>$utctime[1], hour=>$utctime[2], day=>$utctime[3], month=>$utctime[4], year=>$utctime[5]));
+	print encode_string(EDIT_WINDOW->(admin=>$admin, hash=>\@hash, sec=>$utctime[0], min=>$utctime[1], hour=>$utctime[2], day=>$utctime[3], month=>$utctime[4]++, year=>$utctime[5] + 1900, stylesheets=>get_stylesheets(),board=>$board));
 }
 
 
@@ -1818,7 +1862,7 @@ sub make_admin_proxy_panel($)
 	my ($admin)=@_;
 	my ($sth,$row,@scanned,$prevtype);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'proxy');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -1838,7 +1882,7 @@ sub make_admin_proxy_panel($)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(PROXY_PANEL_TEMPLATE->(admin=>$admin,scanned=>\@scanned,username=>$username,type=>$type));
+	print encode_string(PROXY_PANEL_TEMPLATE->(admin=>$admin,scanned=>\@scanned,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board));
 }
 
 sub make_admin_spam_panel($)
@@ -1847,7 +1891,7 @@ sub make_admin_spam_panel($)
 	my @spam_files=SPAM_FILES;
 	my @spam=read_array($spam_files[0]);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'spam');
 	make_error("Insufficient Privledges") if ($type eq "mod");
 	
 	# Is moderator banned?
@@ -1855,6 +1899,8 @@ sub make_admin_spam_panel($)
 
 	make_http_header();
 	print encode_string(SPAM_PANEL_TEMPLATE->(admin=>$admin,
+	stylesheets=>get_stylesheets(),
+	board=>$board,
 	spamlines=>scalar @spam,
 	username=>$username, type=>$type,
 	spam=>join "\n",map { clean_string($_,1) } @spam, ));
@@ -1865,17 +1911,17 @@ sub make_sql_dump($)
 	my ($admin)=@_;
 	my ($sth,$row,@database);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'sqldump');
 	make_error("Insufficient privledges.") if ($type ne 'admin');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE.";") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE').";") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	while($row=get_decoded_arrayref($sth))
 	{
-		push @database,"INSERT INTO ".SQL_TABLE." VALUES('".
+		push @database,"INSERT INTO ".$board->option('SQL_TABLE')." VALUES('".
 		(join "','",map { s/\\/&#92;/g; $_ } @{$row}). # escape ' and \, and join up all values with commas and apostrophes
 		"');";
 	}
@@ -1883,8 +1929,14 @@ sub make_sql_dump($)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(SQL_DUMP_TEMPLATE->(admin=>$admin,username=>$username, type=>$type,
-	database=>join "<br />",map { clean_string($_,1) } @database));
+	print encode_string(
+		SQL_DUMP_TEMPLATE->(admin=>$admin,
+		username=>$username,
+		type=>$type,
+		stylesheets=>get_stylesheets(),
+		board=>$board,
+		database=>join "<br />",map { clean_string($_,1) } @database
+	));
 }
 
 sub make_sql_interface($$$)
@@ -1892,7 +1944,7 @@ sub make_sql_interface($$$)
 	my ($admin,$nuke,$sql)=@_;
 	my ($sth,$row,@results);
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'sql');
 	make_error("Insufficient privledges.") if $type ne 'admin';
 	
 	# Is moderator banned?
@@ -1900,7 +1952,7 @@ sub make_sql_interface($$$)
 
 	if($sql)
 	{
-		make_error(S_WRONGPASS) if($nuke ne NUKE_PASS); # check nuke password
+		make_error(S_WRONGPASS) if($nuke ne $board->option('NUKE_PASS')); # check nuke password
 
 		my @statements=grep { /^\S/ } split /\r?\n/,decode_string($sql,CHARSET,1);
 
@@ -1921,37 +1973,41 @@ sub make_sql_interface($$$)
 	}
 
 	make_http_header();
-	print encode_string(SQL_INTERFACE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,nuke=>$nuke,
-	results=>join "<br />",map { clean_string($_,1) } @results));
+	print encode_string(SQL_INTERFACE_TEMPLATE->(
+		admin=>$admin,
+		username=>$username,
+		type=>$type,
+		nuke=>$nuke,
+		stylesheets=>get_stylesheets(),
+		board=>$board,
+		results=>join "<br />",map { clean_string($_,1) } @results
+	));
 }
 
 sub make_admin_post($)
 {
 	my ($admin)=@_;
 
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'mpost');
 	
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
 	make_http_header();
-	print encode_string(ADMIN_POST_TEMPLATE->(admin=>$admin,username=>$username,type=>$type));
+	print encode_string(ADMIN_POST_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board));
 }
 
 sub make_staff_activity_panel($$$$$$$$$$)
 {
 	my ($admin,$view,$user_to_view,$action_to_view,$ip_to_view,$post_to_view,$sortby,$order,$page,$perpage) = @_;
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'stafflog');
 	my (@entries,@staff);
 	
 	make_error("Insufficient pivledges") if $type ne 'admin';
 	
 	# Pagination
 	
-	$perpage = 50 if ($perpage !~ /^\d+$/);
+	$perpage = 50 if (!$perpage || $perpage !~ /^\d+$/);
 	$page = 1 if (!$page || $page !~ /^\d+$/);
-	my $offset = $perpage * ($page - 1);
-	my $first_entry_for_page = $offset + 1;
-	my $final_entry_for_page = $perpage * $page;
 	
 	# SQL ORDER BY String
 
@@ -1984,6 +2040,11 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE username=?;");
 		$count_get->execute($user_to_view) or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
+		my $number_of_pages = int (($count+$perpage-1)/$perpage);
+		$page = $number_of_pages if ($page > $number_of_pages);
+		my $offset = $perpage * ($page - 1);
+		my $first_entry_for_page = $offset + 1;
+		my $final_entry_for_page = $perpage * $page;
 	
 		$count_get->finish();
 		
@@ -2002,12 +2063,11 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		}
 
 		my $lastpage = ($entry_number + $offset == $count) ? 1 : 0;
-		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 
 		$sth->finish();
 
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,user_to_view=>$user_to_view,rowcount=>$count,perpage=>$perpage,page=>$page,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_view=>$user_to_view,rowcount=>$count,perpage=>$perpage,page=>$page,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'action')
 	{
@@ -2018,6 +2078,11 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE action=?;");
 		$count_get->execute($action_to_view) or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
+		my $number_of_pages = int (($count+$perpage-1)/$perpage);
+		$page = $number_of_pages if ($page > $number_of_pages);
+		my $offset = $perpage * ($page - 1);
+		my $first_entry_for_page = $offset + 1;
+		my $final_entry_for_page = $perpage * $page;
 	
 		$count_get->finish();
 		
@@ -2031,17 +2096,16 @@ sub make_staff_activity_panel($$$$$$$$$$)
 			$entry_number++;
 			$rowtype^=3;
 			$$row{rowtype}=$rowtype;
-	
+
 			push @entries,$row;
 		}
 		
 		my $lastpage = ($entry_number + $offset == $count) ? 1 : 0;
-		my $number_of_pages = int (($count+$perpage-1)/$perpage);
-
+		
 		$sth->finish();
 
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,rowcount=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,rowcount=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'ip')
 	{
@@ -2050,6 +2114,11 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info LIKE ?;");
 		$count_get->execute('%'.$ip_to_view.'%') or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
+		my $number_of_pages = int (($count+$perpage-1)/$perpage);
+		$page = $number_of_pages if ($page > $number_of_pages);
+		my $offset = $perpage * ($page - 1);
+		my $first_entry_for_page = $offset + 1;
+		my $final_entry_for_page = $perpage * $page;
 	
 		$count_get->finish();
 		
@@ -2068,20 +2137,24 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		}
 		
 		my $lastpage = ($entry_number + $offset == $count) ? 1 : 0;
-		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		$sth->finish();
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,ip_to_view=>$ip_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,ip_to_view=>$ip_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 	elsif ($view eq 'post')
 	{
-		$post_to_view = SQL_TABLE.','.$post_to_view if $post_to_view !~ /,/;
+		$post_to_view = $board->path().','.$post_to_view if $post_to_view !~ /,/;
 		
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info LIKE ?;");
 		$count_get->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
+		my $number_of_pages = int (($count+$perpage-1)/$perpage);
+		$page = $number_of_pages if ($page > $number_of_pages);
+		my $offset = $perpage * ($page - 1);
+		my $first_entry_for_page = $offset + 1;
+		my $final_entry_for_page = $perpage * $page;
 	
 		$count_get->finish();
 		
@@ -2100,18 +2173,22 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		}
 		
 		my $lastpage = ($entry_number + $offset == $count) ? 1 : 0;
-		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		$sth->finish();
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,post_to_view=>$post_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,post_to_view=>$post_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,entries=>\@entries));
 	}
 	else
 	{
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE.";");
 		$count_get->execute or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
+		my $number_of_pages = int (($count+$perpage-1)/$perpage);
+		$page = $number_of_pages if ($page > $number_of_pages);
+		my $offset = $perpage * ($page - 1);
+		my $first_entry_for_page = $offset + 1;
+		my $final_entry_for_page = $perpage * $page;
 	
 		$count_get->finish();
 		
@@ -2130,22 +2207,21 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		}
 		
 		my $lastpage = ($entry_number + $offset == $count) ? 1 : 0;
-		my $number_of_pages = int (($count+$perpage-1)/$perpage);
 		
 		$sth->finish();
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,action=>$action_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
+		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,lastpage=>$lastpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,entries=>\@entries));
 	}
 }
 
 sub show_staff_edit_history($$)
 {
 	my ($admin,$num) = @_;
-	my ($username,$type) = check_password($admin);
+	my ($username,$type) = check_password($admin, '', 1);
 	my @edits;
 	
-	my $sth = $dbh->prepare("SELECT ".SQL_STAFFLOG_TABLE.".username,".SQL_STAFFLOG_TABLE.".date FROM ".SQL_STAFFLOG_TABLE." INNER JOIN ".SQL_TABLE." ON ".SQL_STAFFLOG_TABLE.".info=CONCAT('".SQL_TABLE.",',".SQL_TABLE.".num) WHERE ".SQL_TABLE.".num=? AND ".SQL_STAFFLOG_TABLE.".action='admin_edit' ORDER BY ".SQL_STAFFLOG_TABLE.".date DESC;") or make_error(S_SQLFAIL);
+	my $sth = $dbh->prepare("SELECT ".SQL_STAFFLOG_TABLE.".username,".SQL_STAFFLOG_TABLE.".date FROM ".SQL_STAFFLOG_TABLE." INNER JOIN ".$board->option('SQL_TABLE')." ON ".SQL_STAFFLOG_TABLE.".info=CONCAT('".$board->option('SQL_TABLE').",',".$board->option('SQL_TABLE').".num) WHERE ".$board->option('SQL_TABLE').".num=? AND ".SQL_STAFFLOG_TABLE.".action='admin_edit' ORDER BY ".SQL_STAFFLOG_TABLE.".date DESC;") or make_error(S_SQLFAIL);
 	$sth->execute($num);
 	
 	while(my $row=$sth->fetchrow_hashref())
@@ -2154,7 +2230,7 @@ sub show_staff_edit_history($$)
 	}
 	
 	make_http_header();
-	print encode_string(STAFF_EDIT_HISTORY->(admin=>$admin,username=>$username,type=>$type,num=>$num,edits=>\@edits));
+	print encode_string(STAFF_EDIT_HISTORY->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,num=>$num,edits=>\@edits));
 }
 
 sub get_action_name($;$)
@@ -2170,9 +2246,9 @@ sub get_action_name($;$)
 	  whitelist => { name => "IP Whitelist", content => "Whitelisted IP Address" },
 	  whitelist_edit => { name => "IP Whitelist Revision", content => "Revised Data" },
 	  whitelist_remove => { name => "IP Whitelist Removal", content => "Removed IP Address" },
-	  nocaptcha => { name => "Captcha Exemption", content => "Exempted Tripcode" },
-	  nocaptcha_edit => { name => "Revised Captcha Exemption", content => "Revised Data" },
-	  nocaptcha_remove => { name => "Removed Captcha Exemption", content => "Removed Tripcode" },
+	  trust => { name => "Captcha Exemption", content => "Exempted Tripcode" },
+	  trust_edit => { name => "Revised Captcha Exemption", content => "Revised Data" },
+	  trust_remove => { name => "Removed Captcha Exemption", content => "Removed Tripcode" },
 	  admin_post => { name => "Manager Post", content => "Post" },
 	  admin_edit => { name => "Administrative Edit", content => "Post" },
 	  admin_delete => { name => "Administrative Deletion", content => "Post" },
@@ -2192,6 +2268,10 @@ sub get_action_name($;$)
 	return ($name, $content) if $debug == 1;
 	return ($content) if $debug == 2;
 }
+
+#
+# Staff Login
+#
 
 sub do_login($$$$$)
 {
@@ -2219,39 +2299,90 @@ sub do_login($$$$$)
 	if($crypt)
 	{
 		make_cookies(wakaadmin=>$crypt,
-		-charset=>CHARSET,-autopath=>COOKIE_PATH,-expires=>(($savelogin) ? time+365*24*3600 : time+1800));
+		-charset=>CHARSET,-autopath=>$board->option('COOKIE_PATH'),-expires=>(($savelogin) ? time+365*24*3600 : time+1800));
 		
 		make_cookies(wakaadminsave=>1,
-		-charset=>CHARSET,-autopath=>COOKIE_PATH,-expires=> time+365*24*3600) if $savelogin;
+		-charset=>CHARSET,-autopath=>$board->option('COOKIE_PATH'),-expires=> time+365*24*3600) if $savelogin;
 		
-		make_http_forward(get_secure_script_name()."?task=$nexttask",ALTERNATE_REDIRECT);
+		make_http_forward(get_secure_script_name()."?task=$nexttask&board=".$board->path(),ALTERNATE_REDIRECT);
 	}
-	else { make_admin_login(); }
+	else { make_admin_login($nexttask); }
 }
 
 sub do_logout()
 {
 	make_cookies(wakaadmin=>"",-expires=>1);
 	make_cookies(wakaadminsave=>"",-expires=>1);
-	make_http_forward(get_secure_script_name()."?task=admin",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=admin&board=".$board->path(),ALTERNATE_REDIRECT);
 }
+
+#
+# Staff Verification
+#
+
+sub check_password($$;$)
+{
+	my ($admin,$task_redirect,$editing)=@_;
+	
+	my @adminarray = split (/,/, $admin); # <user>,rc6(<password+hostname>)
+	
+	my $sth=$dbh->prepare("SELECT password, account, disabled, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($adminarray[0]) or make_error(S_SQLFAIL);
+
+	my $row=$sth->fetchrow_hashref();
+	
+	# Access check
+	my $path = $board->path(); # lol
+	make_error("Sorry, you do not have access rights to this board.<br />(Accessible: ".$$row{reign}.")<br /><a href=\"".get_script_name()."?task=logout\">Logout</a>") if ($$row{account} eq 'mod' && $$row{reign} !~ /\b$path\b/o); 
+	make_error("This account is disabled.") if ($$row{disabled});
+	
+	my $encrypted_pass = crypt_password($$row{password});
+	$adminarray[1] =~ s/ /+/g; # Undoing encoding done in cookies. (+ is part of the base64 set)
+	
+	if ($adminarray[1] eq $encrypted_pass && !$$row{disabled}) # Return username,type if correct
+	{
+		make_cookies(wakaadmin=>$admin,
+		-charset=>CHARSET,-autopath=>$board->option('COOKIE_PATH'),-expires=>time+1800) if (!($query->cookie('wakaadminsave')));
+		
+		my $account = $$row{account};
+		$sth->finish();
+		
+		return ($adminarray[0],$account);
+	}
+	
+	$sth->finish();
+	
+	$ENV{HTTP_REFERER} = get_secure_script_name().'?task=admin&board='.$board->path()."&nexttask=".$task_redirect;
+	($editing) ? make_error(S_WRONGPASS,1) : make_error(S_WRONGPASS); # Otherwise, throw an error.
+}
+
+sub crypt_password($) 
+{
+	my $crypt=hide_critical_data((shift).$ENV{REMOTE_ADDR},SECRET); # Add in host address to curb cookie snatchers. Perhaps a MAC should be added in, too?
+	#$crypt=~tr/+/./; # for web shit
+	return $crypt;
+}
+
+#
+# Management
+#
 
 sub do_rebuild_cache($)
 {
 	my ($admin)=@_;
 
-	check_password($admin);
+	check_password($admin, 'rebuild');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	unlink glob RES_DIR.'*'.PAGE_EXT;
+	unlink glob $board->path().'/'.$board->option('RES_DIR').'*'.PAGE_EXT;
 
 	repair_database();
 	build_thread_cache_all();
 	build_cache();
 
-	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
+	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
 }
 
 sub add_admin_entry($$$$$$$$)
@@ -2262,7 +2393,7 @@ sub add_admin_entry($$$$$$$$)
 	
 	my ($ival1,$ival2) = parse_range($ip,$mask);
 
-	my ($username, $accounttype) = check_password($admin);
+	my ($username, $accounttype) = check_password($admin, 'bans');
 
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
@@ -2271,7 +2402,7 @@ sub add_admin_entry($$$$$$$$)
 
 	$comment=clean_string(decode_string($comment,CHARSET));
 	
-	$expiration = ($expiration eq '' || $expiration == 0) ? 0 : $expiration+time();
+	$expiration = (!$expiration) ? 0 : time()+$expiration;
 	
 	make_error(S_STRINGFIELDMISSING) if ($type eq 'wordban' && $sval1 eq '');
 
@@ -2292,18 +2423,18 @@ sub add_admin_entry($$$$$$$$)
 	my $row = $select->fetchrow_hashref;
 	
 	# Add entry to staff log table
-	add_log_entry($username,$type,(($type eq 'ipban' || $type eq 'whitelist') ? dec_to_dot($ival1).' / '.dec_to_dot($ival2) : $sval1),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$$row{num});
+	add_log_entry($username,$type,(($type eq 'ipban' || $type eq 'whitelist') ? dec_to_dot($ival1).' / '.dec_to_dot($ival2) : $sval1),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$$row{num});
 	
 	$select->finish();
 	
-	make_http_forward(get_secure_script_name()."?task=bans",ALTERNATE_REDIRECT);
+	make_http_forward(get_secure_script_name()."?task=bans&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the admin table
 {
 	my ($admin,$num,$type,$comment,$ival1,$ival2,$sval1,$total,$sec,$min,$hour,$day,$month,$year,$noexpire)=@_;
 	my ($sth, $not_total_before, $past_ip, $expiration, $changes);
-	my ($username, $accounttype) = check_password($admin);
+	my ($username, $accounttype) = check_password($admin, 'bans');
 	
 	make_error(S_COMMENT_A_MUST) unless $comment;
 	
@@ -2351,16 +2482,182 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	$sth->finish;
 	
 	# Add log entry
-	add_log_entry($username,$type."_edit",$changes,make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
+	add_log_entry($username,$type."_edit",$changes,make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
 	
 	make_http_header();
-	print encode_string(EDIT_SUCCESSFUL->());
+	print encode_string(EDIT_SUCCESSFUL->(stylesheets=>get_stylesheets(),board=>$board));
 }
+
+sub remove_admin_entry($$$$)
+{
+	my ($admin,$num,$override,$no_redirect)=@_;
+	my ($username, $accounttype) = check_password($admin, 'bans');
+	
+	# Is moderator banned?
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR})) || $override;
+	
+	# Does the ban forbid browsing?
+	my $totalverify_admin = $dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE num=?") or make_error(S_SQLFAIL);
+	$totalverify_admin->execute($num) or make_error(S_SQLFAIL);
+	while (my $row=get_decoded_hashref($totalverify_admin))
+	{
+		# Remove browsing ban if applicable
+		if ($$row{total} eq 'yes')
+		{
+			my $ip = dec_to_dot($$row{ival1});
+			remove_htaccess_entry($ip);
+		}
+		# Add log entry
+		add_log_entry($username,$$row{type}."_remove",(($$row{type} eq 'ipban' || $$row{type} eq 'whitelist') ? dec_to_dot($$row{ival1}).' / '.dec_to_dot($$row{ival2}) : $$row{sval1}),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
+	}
+	$totalverify_admin->finish();
+	
+	my $sth=$dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth->execute($num) or make_error(S_SQLFAIL);
+	$sth->finish();
+
+	make_http_forward(get_secure_script_name()."?task=bans&board=".$board->path(),ALTERNATE_REDIRECT) unless $no_redirect;
+}
+
+sub remove_ban_on_admin($)
+{
+	my $admin = @_;
+	my $sth=$dbh->prepare("SELECT num FROM ".SQL_ADMIN_TABLE." WHERE ? & ival2 = ival1 & ival2") or make_error(S_SQLFAIL);
+	$sth->execute(dot_to_dec($ENV{REMOTE_ADDR})) or make_error(S_SQLFAIL);
+	my @rows_to_delete;
+	while (my $row=get_decoded_hashref($sth))
+	{
+		push @rows_to_delete, $$row{num};
+	}
+	
+	$sth->finish();
+	
+	for (my $i = 0; $i <= $#rows_to_delete; $i++)
+	{
+		remove_admin_entry($admin, $rows_to_delete[$i], 1, 1);
+	}
+	make_http_forward(get_secure_script_name()."?task=bans&board=".$board->path(),ALTERNATE_REDIRECT);
+}
+
+sub delete_all($$$)
+{
+	my ($admin,$unparsedip,$unparsedmask)=@_;
+	my ($sth,$row,@posts);
+	
+	my ($ip, $mask) = parse_range($unparsedip,$unparsedmask);
+
+	check_password($admin, 'mpanel');
+	
+	# Is moderator banned?
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
+
+	$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE ip & ? = ? & ?;") or make_error(S_SQLFAIL);
+	$sth->execute($mask,$ip,$mask) or make_error(S_SQLFAIL);
+	while($row=$sth->fetchrow_hashref()) { push(@posts,$$row{num}); }
+	$sth->finish();
+
+	delete_stuff('',0,0,$admin,1,@posts);
+}
+
+sub update_spam_file($$)
+{
+	my ($admin,$spam)=@_;
+
+	check_password($admin, 'spam');
+	
+	# ADDED - Is moderator banned?
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
+	# END ADDED
+
+	my @spam=split /\r?\n/,$spam;
+	my @spam_files=SPAM_FILES;
+	write_array($spam_files[0],@spam);
+
+	make_http_forward(get_secure_script_name()."?task=spam&board=".$board->path(),ALTERNATE_REDIRECT);
+}
+
+sub do_nuke_database($$)
+{
+	my ($admin,$nuke)=@_;
+
+	my ($username, $type) = check_password($admin, 'nuke');
+	make_error("Insufficient Privledges") if ($type ne 'admin');
+	make_error("Incorrect Nuke Password") if ($nuke ne $board->option('NUKE_PASS'));
+	
+	# ADDED - Is moderator banned?
+	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
+	# END ADDED
+
+	init_database();
+	#init_admin_database();
+	#init_proxy_database();
+
+	# remove images, thumbnails and threads
+	unlink glob $board->path().'/'.board->option('IMG_DIR').'*';
+	unlink glob $board->path().'/'.board->option('THUMB_DIR').'*';
+	unlink glob $board->path().'/'.board->option('RES_DIR').'*';
+
+	build_cache();
+
+	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+}
+
+#
+# .htaccess Management
+#
+
+sub add_htaccess_entry($)
+{
+	my $ip = $_[0];
+	$ip =~ s/\./\\\./g;
+	my $ban_entries_found = 0;
+	my $options_followsymlinks = 0;
+	my $options_execcgi = 0;
+	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") 
+	  or make_error(S_HTACCESSPROBLEM);
+	while (<HTACCESSREAD>)
+	{
+		$ban_entries_found = 1 if m/RewriteEngine\s+On/i;
+		$options_followsymlinks = 1 if m/Options.*?FollowSymLinks/i;
+		$options_execcgi = 1 if m/Options.*?ExecCGI/i;
+	}
+	close HTACCESSREAD;
+	open (HTACCESS, ">>".HTACCESS_PATH.".htaccess");
+	print HTACCESS "\n".'Options +FollowSymLinks'."\n" if !$options_followsymlinks;
+	print HTACCESS "\n".'Options +ExecCGI'."\n" if !$options_execcgi;
+	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
+	print HTACCESS "\n".'# Ban added by Wakaba'."\n";
+	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
+	print HTACCESS 'RewriteRule !(\.pl|\.js$|\.css$|\.php$|sugg|ban_images) '.$ENV{SCRIPT_NAME}.'?task=banreport'."\n";
+	# mod_rewrite entry. This is customized for Desuchan and would have to be a config.pl option in a public release.
+	close HTACCESS;
+}
+
+sub remove_htaccess_entry($)
+{
+	my $ip = $_[0];
+	$ip =~ s/\./\\\\\./g;
+	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
+	my $file_contents;
+	while (<HTACCESSREAD>)
+	{	
+		$file_contents .= $_;
+	}
+	$file_contents =~ s/(.*)\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\).*?\?task\=banreport\n(.*)/$1$2/s;
+	close HTACCESSREAD;
+	open (HTACCESSWRITE, ">".HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
+	print HTACCESSWRITE $file_contents;
+	close HTACCESSWRITE;
+}
+
+#
+# Staff Management and Logging
+#
 
 sub manage_staff($)
 {
 	my ($admin) = @_;
-	my ($username, $type) = check_password($admin);
+	my ($username, $type) = check_password($admin, 'staff');
 	my @users;
 		
 	make_error("Insufficient privledges.") if ($type ne 'admin'); 
@@ -2392,207 +2689,287 @@ sub manage_staff($)
 	my @boards = get_boards();
 
 	make_http_header();
-	print encode_string(STAFF_MANAGEMENT->(username=>$username, type=>$type, boards=>\@boards, admin=>$admin, users=>\@users));
+	print encode_string(STAFF_MANAGEMENT->(admin=>$admin, username=>$username, type=>$type, stylesheets=>get_stylesheets(), boards=>\@boards, board=>$board, users=>\@users));
 }
 
-sub remove_admin_entry($$$$)
+sub make_remove_user_account_window($$)
 {
-	my ($admin,$num,$override,$no_redirect)=@_;
-	my ($username, $accounttype) = check_password($admin);
+	my ($admin,$user_to_delete)=@_;
+	my ($username, $type) = check_password($admin, 'staff');
 	
-	# Is moderator banned?
-	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR})) || $override;
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+	make_error("No username specified.") if (!$user_to_delete); 
+	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
+
+	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
 	
-	# Does the ban forbid browsing?
-	my $totalverify_admin = $dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE num=?") or make_error(S_SQLFAIL);
-	$totalverify_admin->execute($num) or make_error(S_SQLFAIL);
-	while (my $row=get_decoded_hashref($totalverify_admin))
+	my $row = $sth->fetchrow_hashref();
+	my $account = $$row{account};
+	
+	$sth->finish();
+	
+	make_http_header();
+	print encode_string(STAFF_DELETE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_delete=>$user_to_delete));
+}
+
+sub remove_user_account($$$)
+{
+	my ($admin,$user_to_delete,$admin_pass)=@_;
+	my ($username, $type) = check_password($admin, 'staff');
+	
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+	make_error("No username specified.") if (!$user_to_delete); 
+	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
+	
+	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
+	
+	my $row = $sth->fetchrow_hashref();
+	
+	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $admin_pass ne ADMIN_PASS);
+	
+	$sth->finish();
+	
+	my $deletion=$dbh->prepare("DELETE FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$deletion->execute($user_to_delete) or make_error(S_SQLFAIL);
+	$deletion->finish();
+	
+	make_http_forward(get_secure_script_name()."?task=staff&board=".$board->path(),ALTERNATE_REDIRECT);
+}
+
+sub make_disable_user_account_window($$)
+{
+	my ($admin,$user_to_disable)=@_;
+	my ($username, $type) = check_password($admin, 'staff');
+	
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+	make_error("No username specified.") if (!$user_to_disable); 
+	make_error("Give me back the razor, emo kid.") if ($user_to_disable eq $username);
+
+	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
+	
+	my $row = $sth->fetchrow_hashref();
+	
+	my $account = $$row{account};
+	
+	$sth->finish();
+	
+	make_http_header();
+	print encode_string(STAFF_DISABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_disable=>$user_to_disable));
+}
+
+sub disable_user_account($$$)
+{
+	my ($admin,$user_to_disable,$admin_pass) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
+	
+	# Sanity checks
+	make_error("No username specified.") if (!$user_to_disable);
+	make_error("Give me back the razor, emo kid.") if ($username eq $user_to_disable);
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+	
+	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
+	
+	my $row = $sth->fetchrow_hashref();
+	
+	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $admin_pass ne ADMIN_PASS);
+	
+	$sth->finish();
+	
+	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='1' WHERE username=?;") or make_error(S_SQLFAIL);
+	$disable->execute($user_to_disable) or make_error(S_SQLFAIL);
+	$disable->finish();
+	
+	make_http_forward(get_secure_script_name()."?task=staff&board=".$board->path(),ALTERNATE_REDIRECT);
+}
+
+sub make_enable_user_account_window($$)
+{
+	my ($admin,$user_to_enable) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
+	
+	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);
+	
+	my $row = $sth->fetchrow_hashref();
+	
+	my $account = $$row{account};
+	
+	$sth->finish();
+	
+	make_http_header();
+	print encode_string(STAFF_ENABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_enable=>$user_to_enable));
+}
+
+sub enable_user_account($$$)
+{
+	my ($admin, $user_to_enable, $management_password) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
+	
+	make_error("No username specified.") if (!$user_to_enable);
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+
+	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);	
+	
+	my $row = $sth->fetchrow_hashref();
+	
+	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $management_password ne ADMIN_PASS);
+	
+	$sth->finish();
+	
+	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='0' WHERE username=?;") or make_error(S_SQLFAIL);
+	$disable->execute($user_to_enable) or make_error(S_SQLFAIL);
+	$disable->finish();
+	
+	make_http_forward(get_secure_script_name()."?task=staff&board=".$board->path(),ALTERNATE_REDIRECT);
+}
+
+sub make_edit_user_account_window($$)
+{
+	my ($admin,$user_to_edit) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
+	my @users;
+	
+	make_error("Insufficient privledges.") if ($type ne 'admin' && $user_to_edit ne $username);
+	
+	my $sth=$dbh->prepare("SELECT account, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
+	
+	my $row = $sth->fetchrow_hashref();
+	my $account = $$row{account};
+	
+	my @boards = get_boards();
+	my @reign = sort (split (/ /, $$row{reign})); # Sort the list of boards so we can do quicker trickery with shift() 
+	
+	while (@reign)
 	{
-		# Remove browsing ban if applicable
-		if ($$row{total} eq 'yes')
+		my $board_under_power = shift (@reign);
+		foreach my $row (@boards)
 		{
-		my $ip = dec_to_dot($$row{ival1});
-		remove_htaccess_entry($ip);
+			if ($$row{board} eq $board_under_power)
+			{
+				$$row{underpower} = 1; # Mark as ruled with an iron fist.
+				last; 		       # ...And go to the next entry of reign (containing loop).
+			}
 		}
-		# Add log entry
-		add_log_entry($username,$$row{type}."_remove",(($$row{type} eq 'ipban' || $$row{type} eq 'whitelist') ? dec_to_dot($$row{ival1}).' / '.dec_to_dot($$row{ival2}) : $$row{sval1}),make_date(time()+8*3600,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),$num);
-	}
-	$totalverify_admin->finish();
-	
-	my $sth=$dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
-	$sth->execute($num) or make_error(S_SQLFAIL);
-	$sth->finish();
-
-	make_http_forward(get_secure_script_name()."?task=bans",ALTERNATE_REDIRECT) unless $no_redirect;
-}
-
-sub remove_ban_on_admin($)
-{
-	my $admin = @_;
-	my $sth=$dbh->prepare("SELECT num FROM ".SQL_ADMIN_TABLE." WHERE ? & ival2 = ival1 & ival2") or make_error(S_SQLFAIL);
-	$sth->execute(dot_to_dec($ENV{REMOTE_ADDR})) or make_error(S_SQLFAIL);
-	my @rows_to_delete;
-	while (my $row=get_decoded_hashref($sth))
-	{
-		push @rows_to_delete, $$row{num};
 	}
 	
 	$sth->finish();
 	
-	for (my $i = 0; $i <= $#rows_to_delete; $i++)
-	{
-		remove_admin_entry($admin, $rows_to_delete[$i], 1, 1);
-	}
-	make_http_forward(get_secure_script_name()."?task=bans",ALTERNATE_REDIRECT);
+	make_http_header();
+	print encode_string(STAFF_EDIT_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_edit=>$user_to_edit,boards=>\@boards,account=>$account));
 }
 
-sub delete_all($$$)
+sub edit_user_account($$$$$$@)
 {
-	my ($admin,$unparsedip,$unparsedmask)=@_;
-	my ($sth,$row,@posts);
-	
-	my ($ip, $mask) = parse_range($unparsedip,$unparsedmask);
+	my ($admin,$management_password,$user_to_edit,$newpassword,$newclass,$originalpassword,@reign) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
+	my $forcereign = 0;
 
-	check_password($admin);
-	
-	# Is moderator banned?
-	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
+	# Sanity check
+	make_error("Insufficient privledges.") if ($user_to_edit ne $username && $type ne 'admin');
+	make_error("No user specified.") if (!$user_to_edit);
+	make_error("Please input only Latin letters, numbers, and underscores for the password.") if ($newpassword && $newpassword !~ /^[\w\d_]+$/);
+	make_error("Please limit the password to thirty characters maximum.") if ($newpassword && length $newpassword > 30);
+	make_error("Passwords should be at least eight characters!") if ($newpassword && length $newpassword < 8);
 
-	$sth=$dbh->prepare("SELECT num FROM ".SQL_TABLE." WHERE ip & ? = ? & ?;") or make_error(S_SQLFAIL);
-	$sth->execute($mask,$ip,$mask) or make_error(S_SQLFAIL);
-	while($row=$sth->fetchrow_hashref()) { push(@posts,$$row{num}); }
+	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
+
+	my $row = $sth->fetchrow_hashref();
+
+	make_error("Cannot alter your own account class.") if ($newclass && $user_to_edit eq $username && $newclass ne $$row{account});
+	make_error("Cannot change your own reign.") if (@reign && join (" ", @reign) ne $$row{reign} && $user_to_edit eq $username);
+	
+	# Clear out unneeded changes
+	$newclass = '' if ($newclass eq $$row{account});
+	@reign = split (/ /, $$row{reign}) if (!@reign);
+	@reign = () if ($newclass && $newclass ne 'mod');
+	
+	# Users can change their own password, but not others' if they are without administrative rights.
+	make_error("Password incorrect.") if ($user_to_edit eq $username && hide_critical_data($originalpassword,SECRET) ne $$row{password});
+	# Management password required for promoting an account to the Administrator class or editing an existing Administrator account.
+	make_error("Management password incorrect.") if ((($$row{account} eq 'admin' && $user_to_edit ne $username) || ($newclass ne $$row{account} && $newclass eq 'admin')) && $management_password ne ADMIN_PASS);
+	
+	if ($newpassword)
+	{
+		my $pass_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET password=? WHERE username=?;") or make_error(S_SQLFAIL);
+		$pass_change->execute(hide_critical_data($newpassword,SECRET),$user_to_edit) or make_error(S_SQLFAIL);
+		$pass_change->finish();
+	}
+
+	if ($newclass)
+	{
+		my $class_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET account=? WHERE username=?;") or make_error(S_SQLFAIL);
+		$class_change->execute($newclass,$user_to_edit) or make_error(S_SQLFAIL);
+		$class_change->finish();
+	}
+
+	if ($$row{account} eq 'mod') # If user was a moderator (whether user still is or is being promoted), then update reign string 
+	{
+		my $reignstring = join (" ", @reign);
+		my $reign_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET reign=? WHERE username=?;") or make_error(S_SQLFAIL);
+		$reign_change->execute($reignstring,$user_to_edit) or make_error(S_SQLFAIL);
+		$reign_change->finish();
+	}
+
 	$sth->finish();
-
-	delete_stuff('',0,0,$admin,@posts);
+	
+	# Redirect, depending on context.		
+	make_http_forward(get_secure_script_name()."?task=admin&board=".$board->path()) if ($username eq $user_to_edit);
+	make_http_forward(get_secure_script_name()."?task=staff&board=".$board->path()) if ($username ne $user_to_edit);
 }
 
-sub update_spam_file($$)
+sub create_user_account($$$$$@)
 {
-	my ($admin,$spam)=@_;
+	my ($admin,$user_to_create,$password,$account_type,$management_password,@reign) = @_;
+	my ($username, $type) = check_password($admin, 'staff');
 
-	check_password($admin);
+	# Sanity checks
+	make_error("Insufficient privledges.") if ($type ne 'admin');
+	make_error("A username is necessary.") if (!$user_to_create);
+	make_error("A password is necessary.") if (!$password);
+	make_error("Please input only Latin letters (a-z), numbers (0-9), and some punctuation marks (_,^,.) for the password.") if ($password !~ /^[\w\^\.]+$/);
+	make_error("Please input only Latin letters (a-z), numbers (0-9), and some punctuation marks (_,^,.) for the username.") if ($user_to_create !~ /^[\w\^\.\s]+$/);
+	make_error("Please limit the username to thirty characters maximum.") if (length $user_to_create > 30);
+	make_error("Please have a username of at least four characters.") if (length $user_to_create < 4);
+	make_error("Please limit the password to thirty characters maximum.") if (length $password > 30);
+	make_error("Passwords should be at least eight characters!") if (length $password < 8);
+	make_error("No boards specified for local moderator.") if (!@reign && $account_type eq 'mod');
 	
-	# ADDED - Is moderator banned?
-	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
-	# END ADDED
-
-	my @spam=split /\r?\n/,$spam;
-	my @spam_files=SPAM_FILES;
-	write_array($spam_files[0],@spam);
-
-	make_http_forward(get_secure_script_name()."?task=spam",ALTERNATE_REDIRECT);
-}
-
-sub do_nuke_database($)
-{
-	my ($admin)=@_;
-
-	check_password($admin,NUKE_PASS);
+	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($user_to_create) or make_error(S_SQLFAIL);
+	my $row = $sth->fetchrow_hashref();
 	
-	# ADDED - Is moderator banned?
-	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
-	# END ADDED
-
-	init_database();
-	#init_admin_database();
-	#init_proxy_database();
-
-	# remove images, thumbnails and threads
-	unlink glob IMG_DIR.'*';
-	unlink glob THUMB_DIR.'*';
-	unlink glob RES_DIR.'*';
-
-	build_cache();
-
-	make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
-}
-
-sub check_password($;$)
-{
-	my ($admin,$editing)=@_;
+	make_error("Username exists.") if ($row);
+	make_error("Password for management incorrect.") if ($account_type eq 'admin' && $management_password ne ADMIN_PASS);
 	
-	my @adminarray = split (/,/, $admin); # <user>,rc6(<password+hostname>)
-	
-	my $sth=$dbh->prepare("SELECT password, account, disabled, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($adminarray[0]) or make_error(S_SQLFAIL);
-
-	my $row=$sth->fetchrow_hashref();
-	
-	# Access check
-	my $sql_table = SQL_TABLE; # lol
-	make_error("Sorry, you do not have access rights to this board.<br />(Accessible: ".$$row{reign}.")<br /><a href=\"".get_script_name()."?task=logout\">Logout</a>") if ($$row{account} eq 'mod' && $$row{reign} !~ /\b$sql_table\b/o); 
-	make_error("This account is disabled.") if ($$row{disabled});
-	
-	my $encrypted_pass = crypt_password($$row{password});
-	$adminarray[1] =~ s/ /+/g; # Undoing re-encoding done in cookies. (+ is part of the base64 set)
-	
-	if ($adminarray[1] eq $encrypted_pass && !$$row{disabled}) # Return username,type if correct
+	my $reignstring = '';
+	if ($account_type eq 'mod') # Handle list of boards under jurisdiction if user is to be a local moderator.
 	{
-		make_cookies(wakaadmin=>$admin,
-		-charset=>CHARSET,-autopath=>COOKIE_PATH,-expires=>time+1800) if (!($query->cookie('wakaadminsave')));
-		
-		my $account = $$row{account};
-		$sth->finish();
-		
-		return ($adminarray[0],$account);
+		$reignstring = join (" ", @reign);
 	}
+	
+	my $encrypted_password = hide_critical_data($password, SECRET);
 	
 	$sth->finish();
-
-	($editing) ? make_error(S_WRONGPASS,1) : make_error(S_WRONGPASS); # Otherwise, throw an error.
+	
+	insert_user_account_entry($user_to_create,$encrypted_password,$reignstring,$account_type);
+	
+	make_http_forward(get_secure_script_name()."?task=staff&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
-sub crypt_password($) 
+sub insert_user_account_entry($$$$)
 {
-	my $crypt=hide_critical_data((shift).$ENV{REMOTE_ADDR},SECRET); # Add in host address to curb cookie snatchers. Perhaps a MAC should be added in, too?
-	#$crypt=~tr/+/./; # for web shit
-	return $crypt;
+	my ($username,$encrypted_password,$reignstring,$type) = @_;
+	my $sth=$dbh->prepare("INSERT INTO ".SQL_ACCOUNT_TABLE." VALUES (?,?,?,?,?);") or make_error(S_SQLFAIL);
+	$sth->execute($username,$type,$encrypted_password,$reignstring,0) or make_error(S_SQLFAIL);
+	$sth->finish();
 }
-
-sub add_htaccess_entry($)
-{
-	my $ip = $_[0];
-	$ip =~ s/\./\\\./g;
-	my $ban_entries_found = 0;
-	my $options_followsymlinks = 0;
-	my $options_execcgi = 0;
-	open (HTACCESSREAD, "../.htaccess") 
-	  or make_error(S_HTACCESSPROBLEM);
-	while (<HTACCESSREAD>)
-	{
-		$ban_entries_found = 1 if m/RewriteEngine\s+On/i;
-		$options_followsymlinks = 1 if m/Options.*?FollowSymLinks/i;
-		$options_execcgi = 1 if m/Options.*?ExecCGI/i;
-	}
-	close HTACCESSREAD;
-	open (HTACCESS, ">>../.htaccess");
-	print HTACCESS "\n".'Options +FollowSymLinks'."\n" if !$options_followsymlinks;
-	print HTACCESS "\n".'Options +ExecCGI'."\n" if !$options_execcgi;
-	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
-	print HTACCESS "\n".'# Ban added by Wakaba'."\n";
-	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS 'RewriteRule !(\.pl|\.js$|\.css$|\.php$|sugg|ban_images) '.$ENV{SCRIPT_NAME}.'?task=banreport'."\n";
-	# mod_rewrite entry. This is customized for Desuchan and would have to be a config.pl option in a public release.
-	close HTACCESS;
-}
-
-sub remove_htaccess_entry($)
-{
-	my $ip = $_[0];
-	$ip =~ s/\./\\\\\./g;
-	open (HTACCESSREAD, "../.htaccess") or make_error(S_HTACCESSCANTREMOVE);
-	my $file_contents;
-	while (<HTACCESSREAD>)
-	{	
-		$file_contents .= $_;
-	}
-	$file_contents =~ s/(.*)\n\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\).*?\?task\=banreport\n(.*)/$1$2/s;
-	close HTACCESSREAD;
-	open (HTACCESSWRITE, ">../.htaccess") or warn "Error writing to .htaccess ";
-	print HTACCESSWRITE $file_contents;
-	close HTACCESSWRITE;
-}
-
 
 sub add_log_entry($$$$$$) # add in new log entry by column (see init)
 {
@@ -2602,9 +2979,8 @@ sub add_log_entry($$$$$$) # add in new log entry by column (see init)
 	$sth->finish();
 }
 
-
 #
-# Page creation utils
+# Page Creation
 #
 
 sub make_http_header()
@@ -2628,32 +3004,33 @@ sub expand_image_filename($)
 {
 	my $filename=shift;
 
-	return expand_filename(clean_path($filename)) unless ENABLE_LOAD;
+	return expand_filename(clean_path($filename)) unless $board->option('ENABLE_LOAD');
 
 	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
-	my $src=IMG_DIR;
+	my $src=$board->option('IMG_DIR');
 	$filename=~/$src(.*)/;
-	return $self_path.REDIR_DIR.clean_path($1).'.html';
+	return $self_path.$board.'/'.$board->option('REDIR_DIR').clean_path($1).'.html';
 }
 
 sub get_reply_link($$)
 {
 	my ($reply,$parent)=@_;
 
-	return expand_filename(RES_DIR.$parent.PAGE_EXT).'#'.$reply if($parent);
-	return expand_filename(RES_DIR.$reply.PAGE_EXT);
+	return expand_filename($board->option('RES_DIR').$parent.PAGE_EXT).'#'.$reply if($parent);
+	return expand_filename($board->option('RES_DIR').$reply.PAGE_EXT);
 }
 
 sub get_page_count(;$)
 {
 	my $total=(shift or count_threads());
-	return int(($total+IMAGES_PER_PAGE-1)/IMAGES_PER_PAGE);
+	return int(($total+$board->option('IMAGES_PER_PAGE')-1)/$board->option('IMAGES_PER_PAGE'));
 }
 
 sub get_filetypes()
 {
-	my %filetypes=FILETYPES;
+	my %filetypes=$board->option('FILETYPES');
 	$filetypes{gif}=$filetypes{jpg}=$filetypes{png}=1;
+	delete $filetypes{''}; # Yes, such a key can actually exist depending on how configuration is done. O lawd.
 	return join ", ",map { uc } sort keys %filetypes;
 }
 
@@ -2670,19 +3047,68 @@ sub parse_range($$)
 	return ($ip,$mask);
 }
 
+#
+# Other
+#
 
+sub get_stylesheets(;$) # Grab stylesheets for use in rendered pages
+{
+	my ($cached_page) = @_;
+	my $found=0;
+	my @stylesheets=map
+	{
+		my %sheet;
 
+		$sheet{filename}=$_;
+		if ($cached_page eq 'board') # Strip path for use in cached board pages
+		{
+			my $board_path = $board->path().'/';
+			$sheet{filename} =~ s/^$board_path//;
+		}
+		elsif ($cached_page eq 'thread') # Replace board path with parent dir for use in cached thread pages
+		{
+			my $board_path = $board->path();
+			$sheet{filename} =~ s/^${board_path}/\.\./;	
+		}
+
+		($sheet{title})=m!([^/]+)\.css$!i;
+		$sheet{title}=ucfirst $sheet{title};
+		$sheet{title}=~s/_/ /g;
+		$sheet{title}=~s/ ([a-z])/ \u$1/g;
+		$sheet{title}=~s/([a-z])([A-Z])/$1 $2/g;
+
+		if($sheet{title} eq $board->option('DEFAULT_STYLE')) { $sheet{default}=1; $found=1; }
+		else { $sheet{default}=0; }
+
+		\%sheet;
+	} glob($board->path().'/'.$board->option('CSS_DIR')."*.css");
+
+	$stylesheets[0]{default}=1 if(@stylesheets and !$found);
+
+	return \@stylesheets;
+}
+
+sub expand_filename($)
+{
+	my ($filename)=@_;
+	return $filename if($filename=~m!^/!);
+	return $filename if($filename=~m!^\w+:!);
+
+	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
+	my $board_path=$board->path().'/';
+	return $self_path.$board_path.$filename;
+}
 
 #
-# Database utils
+# Database Auditing and Management
 #
 
 sub init_database()
 {
 	my ($sth);
 
-	$sth=$dbh->do("DROP TABLE ".SQL_TABLE.";") if(table_exists(SQL_TABLE));
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_TABLE." (".
+	$sth=$dbh->do("DROP TABLE ".$board->option('SQL_TABLE').";") if(table_exists($board->option('SQL_TABLE')));
+	$sth=$dbh->prepare("CREATE TABLE ".$board->option('SQL_TABLE')." (".
 
 	"num ".get_sql_autoincrement().",".	# Post number, auto-increments
 	"parent INTEGER,".			# Parent post for replies in threads. For original posts, must be set to 0 (and not null)
@@ -2796,7 +3222,7 @@ sub init_common_site_database() # Index of all the boards sharing the same image
 	
 	$sth=$dbh->do("DROP TABLE ".SQL_COMMON_SITE_TABLE.";") if table_exists(SQL_COMMON_SITE_TABLE);
 	$sth=$dbh->prepare("CREATE TABLE ".SQL_COMMON_SITE_TABLE." (".
-	"board VARCHAR(25) PRIMARY KEY NOT NULL UNIQUE,".	# Name of board/comment table
+	"board VARCHAR(25) PRIMARY KEY NOT NULL UNIQUE,".	# Name of comment table
 	"type TEXT".						# Corresponding board type? (Later use)
 	");") or make_error(S_SQLFAIL);				# And that's it. Hopefully this is a more efficient solution than handling it all in code or a text file.
 	
@@ -2808,7 +3234,7 @@ sub repair_database()
 {
 	my ($sth,$row,@threads,$thread);
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	while($row=$sth->fetchrow_hashref()) { push(@threads,$row); }
@@ -2818,7 +3244,7 @@ sub repair_database()
 		# fix lasthit
 		my ($upd);
 
-		$upd=$dbh->prepare("UPDATE ".SQL_TABLE." SET lasthit=? WHERE parent=?;") or make_error(S_SQLFAIL);
+		$upd=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET lasthit=? WHERE parent=?;") or make_error(S_SQLFAIL);
 		$upd->execute($$row{lasthit},$$row{num}) or make_error(S_SQLFAIL." ".$dbh->errstr());
 		$upd->finish();
 	}
@@ -2838,38 +3264,38 @@ sub trim_database()
 {
 	my ($sth,$row,$order);
 
-	if(TRIM_METHOD==0) { $order='num ASC'; }
+	if($board->option('TRIM_METHOD')==0) { $order='num ASC'; }
 	else { $order='lasthit ASC'; }
 
-	if(MAX_AGE) # needs testing
+	if($board->option('MAX_AGE')) # needs testing
 	{
-		my $mintime=time()-(MAX_AGE)*3600;
+		my $mintime=time()-($board->option('MAX_AGE'))*3600;
 
-		$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE parent=0 AND timestamp<=$mintime AND stickied <> 1;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0 AND timestamp<=$mintime AND stickied <> 1;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 
 		while($row=$sth->fetchrow_hashref())
 		{
-			delete_post($$row{num},"",0,ARCHIVE_MODE);
+			delete_post($$row{num},"",0,$board->option('ARCHIVE_MODE'));
 		}
 	}
 
 	my $threads=count_threads();
 	my ($posts,$size)=count_posts();
-	my $max_threads=(MAX_THREADS or $threads);
-	my $max_posts=(MAX_POSTS or $posts);
-	my $max_size=(MAX_MEGABYTES*1024*1024 or $size);
+	my $max_threads=($board->option('MAX_THREADS') or $threads);
+	my $max_posts=($board->option('MAX_POSTS') or $posts);
+	my $max_size=($board->option('MAX_MEGABYTES')*1024*1024 or $size);
 
 	while($threads>$max_threads or $posts>$max_posts or $size>$max_size)
 	{
-		$sth=$dbh->prepare("SELECT * FROM ".SQL_TABLE." WHERE parent=0 AND stickied <> 0 ORDER BY $order LIMIT 1;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0 AND stickied <> 0 ORDER BY $order LIMIT 1;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 
 		if($row=$sth->fetchrow_hashref())
 		{
 			my ($threadposts,$threadsize)=count_posts($$row{num});
 
-			delete_post($$row{num},"",0,ARCHIVE_MODE);
+			delete_post($$row{num},"",0,$board->option('ARCHIVE_MODE'));
 
 			$threads--;
 			$posts-=$threadposts;
@@ -2881,10 +3307,14 @@ sub trim_database()
 	if ($sth) {$sth->finish();}
 }
 
+#
+# First-Time Setup
+#
+
 sub first_time_setup_page()
 {
 	make_http_header();
-	print encode_string(FIRST_TIME_SETUP->());
+	print encode_string(FIRST_TIME_SETUP->(stylesheets=>get_stylesheets(),board=>$board));
 	last if $count > $maximum_allowed_loops;
 	next;
 }
@@ -2895,7 +3325,7 @@ sub first_time_setup_start($)
 	if ($admin eq ADMIN_PASS)
 	{
 		make_http_header();
-		print encode_string(ACCOUNT_SETUP->(admin=>crypt_password($admin)));
+		print encode_string(ACCOUNT_SETUP->(admin=>crypt_password($admin),stylesheets=>get_stylesheets(),board=>$board));
 	}
 	else
 	{
@@ -2920,292 +3350,13 @@ sub first_time_setup_finalize($$$)
 		init_account_database();
 		init_activity_database();
 		insert_user_account_entry($username,hide_critical_data($password, SECRET),'','admin');
-		make_http_forward(get_secure_script_name."?task=admin",ALTERNATE_REDIRECT);
+		make_http_forward(get_secure_script_name."?task=admin&amp;board=".$board->path,ALTERNATE_REDIRECT);
 
 	}
 	else
 	{
 		make_error('Wrong password');
 	}
-}
-
-sub make_remove_user_account_window($$)
-{
-	my ($admin,$user_to_delete)=@_;
-	my ($username, $type) = check_password($admin);
-	
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-	make_error("No username specified.") if (!$user_to_delete); 
-	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
-
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	my $account = $$row{account};
-	
-	$sth->finish();
-	
-	make_http_header();
-	print encode_string(STAFF_DELETE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,account=>$account,user_to_delete=>$user_to_delete));
-}
-
-sub remove_user_account($$$)
-{
-	my ($admin,$user_to_delete,$admin_pass)=@_;
-	my ($username, $type) = check_password($admin);
-	
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-	make_error("No username specified.") if (!$user_to_delete); 
-	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
-	
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	
-	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $admin_pass ne ADMIN_PASS);
-	
-	$sth->finish();
-	
-	my $deletion=$dbh->prepare("DELETE FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$deletion->execute($user_to_delete) or make_error(S_SQLFAIL);
-	$deletion->finish();
-	
-	make_http_forward(get_secure_script_name()."?task=staff",ALTERNATE_REDIRECT);
-}
-
-sub make_disable_user_account_window($$)
-{
-	my ($admin,$user_to_disable)=@_;
-	my ($username, $type) = check_password($admin);
-	
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-	make_error("No username specified.") if (!$user_to_disable); 
-	make_error("Give me back the razor, emo kid.") if ($user_to_disable eq $username);
-
-	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	
-	my $account = $$row{account};
-	
-	$sth->finish();
-	
-	make_http_header();
-	print encode_string(STAFF_DISABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,account=>$account,user_to_disable=>$user_to_disable));
-}
-
-sub disable_user_account($$$)
-{
-	my ($admin,$user_to_disable,$admin_pass) = @_;
-	my ($username, $type) = check_password($admin);
-	
-	# Sanity checks
-	make_error("No username specified.") if (!$user_to_disable);
-	make_error("Give me back the razor, emo kid.") if ($username eq $user_to_disable);
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-	
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	
-	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $admin_pass ne ADMIN_PASS);
-	
-	$sth->finish();
-	
-	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='1' WHERE username=?;") or make_error(S_SQLFAIL);
-	$disable->execute($user_to_disable) or make_error(S_SQLFAIL);
-	$disable->finish();
-	
-	make_http_forward(get_secure_script_name()."?task=staff",ALTERNATE_REDIRECT);
-}
-
-sub make_enable_user_account_window($$)
-{
-	my ($admin,$user_to_enable) = @_;
-	my ($username, $type) = check_password($admin);
-	
-	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	
-	my $account = $$row{account};
-	
-	$sth->finish();
-	
-	make_http_header();
-	print encode_string(STAFF_ENABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,account=>$account,user_to_enable=>$user_to_enable));
-}
-
-sub enable_user_account($$$)
-{
-	my ($admin, $user_to_enable, $management_password) = @_;
-	my ($username, $type) = check_password($admin);
-	
-	make_error("No username specified.") if (!$user_to_enable);
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);	
-	
-	my $row = $sth->fetchrow_hashref();
-	
-	make_error("Management password incorrect.") if ($$row{account} eq 'admin' && $management_password ne ADMIN_PASS);
-	
-	$sth->finish();
-	
-	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='0' WHERE username=?;") or make_error(S_SQLFAIL);
-	$disable->execute($user_to_enable) or make_error(S_SQLFAIL);
-	$disable->finish();
-	
-	make_http_forward(get_secure_script_name()."?task=staff",ALTERNATE_REDIRECT);
-}
-
-sub make_edit_user_account_window($$)
-{
-	my ($admin,$user_to_edit) = @_;
-	my ($username, $type) = check_password($admin);
-	my @users;
-	
-	make_error("Insufficient privledges.") if ($type ne 'admin' && $user_to_edit ne $username);
-	
-	my $sth=$dbh->prepare("SELECT account, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
-	
-	my $row = $sth->fetchrow_hashref();
-	my $account = $$row{account};
-	
-	my @boards = get_boards();
-	my @reign = sort (split (/ /, $$row{reign})); # Sort the list of boards so we can do quicker trickery with shift() 
-	
-	while (@reign)
-	{
-		my $board_under_power = shift (@reign);
-		foreach my $row (@boards)
-		{
-			if ($$row{board} eq $board_under_power)
-			{
-				$$row{underpower} = 1; # Mark as ruled with an iron fist.
-				last; 		       # ...And go to the next entry of reign (containing loop).
-			}
-		}
-	}
-	
-	$sth->finish();
-	
-	make_http_header();
-	print encode_string(STAFF_EDIT_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,user_to_edit=>$user_to_edit,boards=>\@boards,account=>$account));
-}
-
-sub edit_user_account($$$$$$@)
-{
-	my ($admin,$management_password,$user_to_edit,$newpassword,$newclass,$originalpassword,@reign) = @_;
-	my ($username, $type) = check_password($admin);
-	my $forcereign = 0;
-
-	# Sanity check
-	make_error("Insufficient privledges.") if ($user_to_edit ne $username && $type ne 'admin');
-	make_error("No user specified.") if (!$user_to_edit);
-	make_error("Please input only Latin letters, numbers, and underscores for the password.") if ($newpassword && $newpassword !~ /^[\w\d_]+$/);
-	make_error("Please limit the password to thirty characters maximum.") if ($newpassword && length $newpassword > 30);
-	make_error("Passwords should be at least eight characters!") if ($newpassword && length $newpassword < 8);
-
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
-
-	my $row = $sth->fetchrow_hashref();
-
-	make_error("Cannot alter your own account class.") if ($newclass && $user_to_edit eq $username && $newclass ne $$row{account});
-	make_error("Cannot change your own reign.") if (@reign && join (" ", @reign) ne $$row{reign} && $user_to_edit eq $username);
-	
-	# Clear out unneeded changes
-	$newclass = '' if ($newclass eq $$row{account});
-	@reign = split (/ /, $$row{reign}) if (!@reign);
-	@reign = () if ($newclass && $newclass ne 'mod');
-	
-	# Users can change their own password, but not others' if they are without administrative rights.
-	make_error("Password incorrect.") if ($user_to_edit eq $username && hide_critical_data($originalpassword,SECRET) ne $$row{password});
-	# Management password required for promoting an account to the Administrator class or editing an existing Administrator account.
-	make_error("Management password incorrect.") if ((($$row{account} eq 'admin' && $user_to_edit ne $username) || ($newclass ne $$row{account} && $newclass eq 'admin')) && $management_password ne ADMIN_PASS);
-	
-	if ($newpassword)
-	{
-		my $pass_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET password=? WHERE username=?;") or make_error(S_SQLFAIL);
-		$pass_change->execute(hide_critical_data($newpassword,SECRET),$user_to_edit) or make_error(S_SQLFAIL);
-		$pass_change->finish();
-	}
-
-	if ($newclass)
-	{
-		my $class_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET account=? WHERE username=?;") or make_error(S_SQLFAIL);
-		$class_change->execute($newclass,$user_to_edit) or make_error(S_SQLFAIL);
-		$class_change->finish();
-	}
-
-	if ($$row{account} eq 'mod')
-	{
-		my $reignstring = join (" ", @reign);
-		my $reign_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET reign=? WHERE username=?;") or make_error(S_SQLFAIL);
-		$reign_change->execute($reignstring,$user_to_edit) or make_error(S_SQLFAIL);
-		$reign_change->finish();
-	}
-
-	$sth->finish();
-	
-	# Redirect, depending on context.		
-	make_http_forward(get_secure_script_name()."?task=admin") if ($username eq $user_to_edit);
-	make_http_forward(get_secure_script_name()."?task=staff") if ($username ne $user_to_edit);
-}
-
-sub create_user_account($$$$$@)
-{
-	my ($admin,$user_to_create,$password,$account_type,$management_password,@reign) = @_;
-	my ($username, $type) = check_password($admin);
-
-	# Sanity checks
-	make_error("Insufficient privledges.") if ($type ne 'admin');
-	make_error("A username is necessary.") if (!$user_to_create);
-	make_error("A password is necessary.") if (!$password);
-	make_error("Please input only Latin letters (a-z), numbers (0-9), and some punctuation marks (_,^,.) for the password.") if ($password !~ /^[\w\^\.]+$/);
-	make_error("Please input only Latin letters (a-z), numbers (0-9), and some punctuation marks (_,^,.) for the username.") if ($user_to_create !~ /^[\w\^\.\s]+$/);
-	make_error("Please limit the username to thirty characters maximum.") if (length $user_to_create > 30);
-	make_error("Please have a username of at least four characters.") if (length $user_to_create < 4);
-	make_error("Please limit the password to thirty characters maximum.") if (length $password > 30);
-	make_error("Passwords should be at least eight characters!") if (length $password < 8);
-	make_error("No boards specified for local moderator.") if (!@reign && $account_type eq 'mod');
-	
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
-	$sth->execute($user_to_create) or make_error(S_SQLFAIL);
-	my $row = $sth->fetchrow_hashref();
-	
-	make_error("Username exists.") if ($row);
-	make_error("Password for management incorrect.") if ($account_type eq 'admin' && $management_password ne ADMIN_PASS);
-	
-	my $reignstring = '';
-	if ($account_type eq 'mod') # Handle list of boards under jurisdiction if user is to be a local moderator.
-	{
-		$reignstring = join (" ", @reign);
-	}
-	
-	my $encrypted_password = hide_critical_data($password, SECRET);
-	
-	$sth->finish();
-	
-	insert_user_account_entry($user_to_create,$encrypted_password,$reignstring,$account_type);
-	
-	make_http_forward(get_secure_script_name()."?task=staff",ALTERNATE_REDIRECT);
-}
-
-sub insert_user_account_entry($$$$)
-{
-	my ($username,$encrypted_password,$reignstring,$type) = @_;
-	my $sth=$dbh->prepare("INSERT INTO ".SQL_ACCOUNT_TABLE." VALUES (?,?,?,?,?);") or make_error(S_SQLFAIL);
-	$sth->execute($username,$type,$encrypted_password,$reignstring,0) or make_error(S_SQLFAIL);
-	$sth->finish();
 }
 
 sub table_exists($)
@@ -3223,7 +3374,7 @@ sub count_threads()
 {
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -3237,7 +3388,7 @@ sub count_posts(;$)
 	my ($sth,$where);
 
 	$where="WHERE parent=$parent or num=$parent" if($parent);
-	$sth=$dbh->prepare("SELECT count(*),sum(size) FROM ".SQL_TABLE." $where;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*),sum(size) FROM ".$board->option('SQL_TABLE')." $where;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	my $return = $sth->fetchrow_array();
 	$sth->finish();
@@ -3250,7 +3401,7 @@ sub thread_exists($)
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_TABLE." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -3299,13 +3450,13 @@ sub get_boards()
 	my @boards; # Board list
 	my $board_is_present = 0; # Is the current board present?
 	
-	my $sth = $dbh->prepare("SELECT board FROM ".SQL_COMMON_SITE_TABLE." ORDER BY board;") or make_error(S_SQLFAIL);
+	my $sth = $dbh->prepare("SELECT board AS 'board_entry' FROM ".SQL_COMMON_SITE_TABLE." ORDER BY board;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	
 	while (my $row=$sth->fetchrow_hashref())
 	{
 		push @boards,$row;
-		$board_is_present = 1 if $$row{board} eq SQL_TABLE;
+		$board_is_present = 1 if $$row{board_entry} eq $board->path();
 	}
 	
 	$sth->finish();
@@ -3313,15 +3464,19 @@ sub get_boards()
 	unless ($board_is_present)
 	{
 		my $fix = $dbh->prepare("INSERT INTO ".SQL_COMMON_SITE_TABLE." VALUES(?,?);") or make_error(S_SQLFAIL);
-		$fix->execute(SQL_TABLE,"") or make_error(S_SQLFAIL);
+		$fix->execute($board->path(),"") or make_error(S_SQLFAIL);
 		$fix->finish();
 		
-		my $row = {board=>&SQL_TABLE};
+		my $row = {board_entry=>$board->path()};
 		push @boards, $row;
 	}
 	
 	@boards;
 }
+
+#
+# Script Management
+#
 
 sub abort_user_action()
 {
@@ -3329,11 +3484,169 @@ sub abort_user_action()
 	next;
 }
 
+sub restart_script($)
+{
+	my $admin = $_[0];
+	my ($username, $accounttype) = check_password($admin, 'mpanel');
+	if ($accounttype eq "admin")
+	{
+		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+		last;
+	}
+	else
+	{
+		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+	}
+}
+
 #
-# Optional modules
+# Oekaki
 #
 
-#####################################################
+sub make_painter($$$$$$$$$)
+{
+	my ($oek_painter,$oek_x,$oek_y,$oek_parent,$oek_src,$oek_editing,$num,$password,$dummy)=@_;
+	my $ip=$ENV{REMOTE_ADDR};
+	
+	make_error(S_HAXORING) if($oek_x=~/[^0-9]/ or $oek_y=~/[^0-9]/ or $oek_parent=~/[^0-9]/);
+	make_error(S_HAXORING) if($oek_src and !($board->option('OEKAKI_ENABLE_MODIFY')));
+	make_error(S_HAXORING) if($oek_src=~m![^0-9a-zA-Z/\.]!);
+	make_error(S_OEKTOOBIG) if($oek_x>$board->option('OEKAKI_MAX_X') or $oek_y>$board->option('OEKAKI_MAX_Y'));
+	make_error(S_OEKTOOSMALL) if($oek_x<$board->option('OEKAKI_MIN_X') or $oek_y<$board->option('OEKAKI_MIN_Y'));
+	
+	if ($oek_editing)
+	{
+		my $sth = $dbh->prepare("SELECT password FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
+		$sth->execute($num) or make_error(S_SQLFAIL);
+		my $row=get_decoded_hashref($sth);
+		make_error(S_BADEDITPASS) if ($password ne $$row{password});
+		make_error(S_NOPASS) if ($password eq '');
+		$sth->finish();
+	}
+	
+	my $time=time;
+	
+	if($oek_painter=~/shi/)
+	{
+		my $mode;
+		$mode="pro" if($oek_painter=~/pro/);
+	
+		my $selfy;
+		$selfy=1 if($oek_painter=~/selfy/);
+	
+		print "Content-Type: text/html; charset=Shift_JIS\n";
+		print "\n";
+	
+		print OEKAKI_PAINT_TEMPLATE->(
+			oek_painter=>clean_string($oek_painter),
+			oek_x=>clean_string($oek_x),
+			oek_y=>clean_string($oek_y),
+			oek_parent=>clean_string($oek_parent),
+			oek_src=>expand_filename(clean_string($oek_src)),
+			ip=>$ip,
+			time=>$time,
+			mode=>$mode,
+			selfy=>$selfy,
+			oek_editing=>$oek_editing,
+			num=>$num,
+			password=>$password,
+			dummy => $dummy,
+			tmp_dir => $board->option('TMP_DIR'),
+			board=>$board
+		);
+	}
+	else
+	{
+		make_error(S_OEKUNKNOWN);
+	}
+}
+
+sub make_oekaki_finish($$$$$$$)
+{
+	my $ip=$ENV{REMOTE_ADDR};
+	
+	my ($num, $dummy, $oek_parent, $srcinfo, $oek_editing, $password, $oek_ip) = @_;
+	
+	$oek_ip=$ip unless($oek_ip);
+	
+	make_error('Invalid IP') unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+	
+	my $tmpname=$board->option('TMP_DIR').$oek_ip.'.png';
+	
+	make_http_header();
+
+	if (!$oek_editing)
+	{
+		print OEKAKI_FINISH_TEMPLATE->(
+			tmpname=>$tmpname,
+			oek_parent=>clean_string($oek_parent),
+			oek_ip=>$oek_ip,
+			srcinfo=>clean_string($srcinfo),
+			dummy=>$dummy,
+			decodedinfo=>OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$board->path().'/'.$tmpname)),
+			stylesheets=>get_stylesheets(),
+			board=>$board
+		);
+	}
+	else
+	{	
+		my $sth = $dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num = ?;");
+		$sth->execute($num);
+		my $row = get_decoded_hashref($sth);
+		
+		print OEKAKI_FINISH_EDIT_TEMPLATE->(
+			tmpname=>$tmpname,
+			oek_parent=>clean_string($oek_parent),
+			oek_ip=>$oek_ip,
+			srcinfo=>clean_string($srcinfo),
+			decodedinfo=>OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),
+			num=>$num,
+			dummy => $dummy,
+			comment=>tag_killa($$row{comment}),
+			name=>$$row{name},
+			email=>$$row{email},
+			subject=>$$row{subject},
+			trip=>$$row{trip},
+			password=>$password,
+			stylesheets=>get_stylesheets(),
+			board=>$board
+		);
+		$sth->finish();
+	}
+}
+
+sub pretty_age($)
+{
+	my ($age)=@_;
+
+	return "HAXORED" if($age<0);
+	return $age." s" if($age<60);
+	return int($age/60)." min" if($age<3600);
+	return int($age/3600)." h ".int(($age%3600)/60)." min" if($age<3600*24*7);
+	return "HAXORED";
+}
+
+sub decode_srcinfo($$)
+{
+	my ($srcinfo,$tmpname)=@_;
+	my @info=split /,/,$srcinfo;
+	my @stat=stat $tmpname;
+	my $fileage=$stat[9];
+	my $source = $info[2];
+	my $path = $board->path().'/';
+	$source =~ s/^\/?${path}//;
+	my ($painter)=grep { $$_{painter} eq $info[1] } @{S_OEKPAINTERS()};
+
+	return (
+		time=>clean_string(pretty_age($fileage-$info[0])),
+		painter=>clean_string($$painter{name}),
+		source=>clean_string($source),
+	);
+}
+
+#
+# Main Loop
+#
 
 while ( $query = new CGI::Fast )
 {
@@ -3341,7 +3654,13 @@ while ( $query = new CGI::Fast )
 	
 	# It may be nicer to put this outside the loop... but the database connection seems to expire and stay dead unless it is put in here.
 	$dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL; 
+
+	my $board_name=($query->param("board"));
+	print ("Content-type: text/plain\n\nBoard not found.") and next if ((! -e './'.$board_name && $board_name ne '.glob') || !$board_name || $board_name eq "include");
+	print ("Content-type: text/plain\n\nBoard configuration not found.") and next if (! -e './'.$board_name.'/board_config.pl' && $board_name ne '.glob');
 	
+	$board = Board->new($board_name);
+
 	# check for admin table
 	init_admin_database() if(!table_exists(SQL_ADMIN_TABLE));
 	
@@ -3356,20 +3675,19 @@ while ( $query = new CGI::Fast )
 	
 	# Check for .htaccess
 	
-	if (! -e "../.htaccess")
+	if (! -e HTACCESS_PATH.".htaccess")
 	{
-		open (HTACCESSMAKE, ">../.htaccess");
+		open (HTACCESSMAKE, ">.htaccess");
 		print HTACCESSMAKE "RewriteEngine On\nOptions +FollowSymLinks +ExecCGI\n\n";
 		close HTACCESSMAKE;
 	}
 	
-	if(!table_exists(SQL_TABLE)) # check for comments table
+	if(!table_exists($board->option('SQL_TABLE'))) # check for comments table
 	{
 		init_database();
 		build_cache();
-		make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
-		last if $count > $maximum_allowed_loops;
-		next;
+		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+		abort_user_action();
 	}
 	
 	my $task=($query->param("task") or $query->param("action"));
@@ -3397,11 +3715,14 @@ while ( $query = new CGI::Fast )
 		$removeban->finish();
 	}
 	
+	# Determine what is to be done, based on task parameter.
 	if(!$task)
 	{
-		build_cache() unless -e HTML_SELF;
-		make_http_forward(HTML_SELF,ALTERNATE_REDIRECT);
+		build_cache() unless -e $board->path().'/'.$board->option('HTML_SELF');
+		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
 	}
+	
+	# Posting
 	elsif($task eq "post")
 	{
 		my $parent=$query->param("parent");
@@ -3413,26 +3734,18 @@ while ( $query = new CGI::Fast )
 		my $password=$query->param("password");
 		my $nofile=$query->param("nofile");
 		my $captcha=$query->param("captcha");
-		my $admin = $query->param("admin");
+		my $admin = $query->cookie("wakaadmin");
 		my $no_captcha=$query->param("no_captcha");
 		my $no_format=$query->param("no_format");
 		my $sticky=$query->param("sticky");
 		my $lock=$query->param("lock");
+		my $admin_post = $query->param("adminpost");
 		# (postfix removed--oekaki only)
 	
-		post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,'',$sticky,$lock);
+		post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,'',$sticky,$lock,$admin_post);
 	}
-	elsif($task eq "delete")
-	{
-		my $password = ($query->param("singledelete")) ? $query->param("postpassword") : $query->param("password");
-		my $fileonly = $query->param("fileonly");
-		my $archive=$query->param("archive");
-		my $fromwindow = $query->param("fromwindow"); # Is it from a window or a collapsable field?
-		my $admin=$query->param("admin");
-		my @posts = ($query->param("singledelete")) ? $query->param("deletepost") : $query->param("delete");
 	
-		delete_stuff($password,$fileonly,$archive,$admin,$fromwindow,@posts);
-	}
+	# Management
 	elsif($task eq "admin")
 	{
 		my $password=$query->param("berra"); # lol obfuscation
@@ -3546,7 +3859,8 @@ while ( $query = new CGI::Fast )
 	elsif($task eq "nuke")
 	{
 		my $admin = $query->cookie("wakaadmin");
-		do_nuke_database($admin);
+		my $nuke = $query->param("nuke");
+		do_nuke_database($admin, $nuke);
 	}
 	elsif($task eq "banreport")
 	{
@@ -3577,12 +3891,27 @@ while ( $query = new CGI::Fast )
 		my $num = $query->param("num");
 		make_admin_ban_edit($admin, $num);	
 	}
+	
+	# Post Deletion and Editing
+	elsif($task eq "delete")
+	{
+		my $password = ($query->param("singledelete")) ? $query->param("postpassword") : $query->param("password");
+		my $fileonly = ($query->param("singledelete")) ? $query->param("postfileonly") : $query->param("fileonly");
+		my $archive=$query->param("archive");
+		my $fromwindow = $query->param("fromwindow"); # Is it from a window or a collapsable field?
+		my $admin=$query->cookie("wakaadmin");
+		my $admin_delete = $query->param("admindelete");
+		my @posts = ($query->param("singledelete")) ? $query->param("deletepost") : $query->param("delete");
+	
+		delete_stuff($password,$fileonly,$archive,$admin,$admin_delete,$fromwindow,@posts);
+	}
 	elsif($task eq "editpostwindow")
 	{
 		my $num = $query->param("num");
 		my $password = $query->param("password");
-		my $admin = $query->param("admin");
-		edit_window($num, $password, $admin);
+		my $admin = $query->cookie("wakaadmin");
+		my $admin_edit = $query->param("admineditmode");
+		edit_window($num, $password, $admin, $admin_edit);
 	}
 	elsif($task eq "delpostwindow")
 	{
@@ -3598,13 +3927,14 @@ while ( $query = new CGI::Fast )
 		my $comment=$query->param("comment");
 		my $file=$query->param("file");
 		my $captcha=$query->param("captcha");
-		my $admin = $query->param("admin");               
+		my $admin = $query->cookie("wakaadmin");               
 		my $no_captcha=$query->param("no_captcha");
 		my $no_format=$query->param("no_format");
 		my $postfix=$query->param("postfix");
 		my $password = $query->param("password");
 		my $killtrip = $query->param("killtrip");
-		edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip);
+		my $admin_edit = $query->param("adminedit");
+		edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip,$admin_edit);
 	}
 	elsif($task eq "edit")
 	{
@@ -3612,6 +3942,8 @@ while ( $query = new CGI::Fast )
 		my $admin_post = $query->param("admin_post");
 		password_window($num, $admin_post, "edit");
 	}
+	
+	# Administrative Thread Management
 	elsif($task eq "sticky")
 	{
 		my $num = $query->param("thread");
@@ -3636,6 +3968,8 @@ while ( $query = new CGI::Fast )
 		my $admin = $query->cookie("wakaadmin");
 		unlock_thread($num, $admin);
 	}
+	
+	# First-time Wakaba Setup
 	elsif($task eq "entersetup")
 	{
 		my $password = $query->param("berra");
@@ -3655,7 +3989,6 @@ while ( $query = new CGI::Fast )
 	}
 	
 	# Staff Management Panels
-	
 	elsif ($task eq "deleteuserwindow")
 	{
 		my $admin = $query->cookie("wakaadmin");
@@ -3681,8 +4014,77 @@ while ( $query = new CGI::Fast )
 		make_edit_user_account_window($admin,$username);
 	}
 	
-	# Staff Management Subroutines
+	# Oekaki Stuff
+	elsif ($task eq "paint")
+	{
+		my $oek_painter=$query->param("oek_painter");
+		my $oek_x=$query->param("oek_x");
+		my $oek_y=$query->param("oek_y");
+		my $oek_parent=$query->param("oek_parent");
+		my $oek_src=$query->param("oek_src");
+		my $oek_editing=$query->param("oek_editing");
+		my $num=$query->param("num");
+		my $password=$query->param("password");
+		my $dummy=$query->param("dummy");
+		make_painter($oek_painter,$oek_x,$oek_y,$oek_parent,$oek_src,$oek_editing,$num,$password,$dummy);
+	}
+	elsif ($task eq "finishpaint")
+	{
+		my $num=$query->param("num");
+		my $dummy=$query->param("dummy");
+		my $oek_parent=$query->param("oek_parent");
+		my $srcinfo=$query->param("srcinfo");
+		my $oek_editing=$query->param("oek_editing");
+		my $password=$query->param("password");
+		my $oek_ip=$query->param("oek_ip");
+		make_oekaki_finish($num, $dummy, $oek_parent, $srcinfo, $oek_editing, $password, $oek_ip);
+	}
+	elsif ($task eq "oekakipost")
+	{
+		my $parent=$query->param("parent");
+		my $oek_ip=$query->param("oek_ip");
+		$oek_ip ||= $ENV{REMOTE_ADDR};
+		abort_user_action() unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+		my $tmpname=($board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.png'); # Open up the oekaki the user has uploaded...
+		open (TMPFILE,$tmpname) or make_error("Can't read uploaded file");
+		my $name=$query->param("field1");
+		my $email=$query->param("email");
+		my $subject=$query->param("subject");
+		my $comment=$query->param("comment");
+		my $password=$query->param("password");
+		my $captcha=$query->param("captcha");
+		my $srcinfo=$query->param("srcinfo");
+		
+		post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,0,$captcha,'',0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),0,0,0);
+		
+		close TMPFILE;
+		unlink $tmpname;
+	}
+	elsif ($task eq "oekakiedit")
+	{
+		my $num=$query->param("num");
+		my $oek_ip=$query->param("oek_ip");
+		$oek_ip ||= $ENV{REMOTE_ADDR};
+		abort_user_action() unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+		my $tmpname=$board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.png';
+		open TMPFILE,$tmpname or make_error("Can't read uploaded file");
+		my $name=$query->param("field1");
+		my $email=$query->param("email");
+		my $subject=$query->param("subject");
+		my $comment=$query->param("comment");
+		my $password=$query->param("password");
+		my $captcha=$query->param("captcha");
+		my $srcinfo=$query->param("srcinfo");
+		my $password=$query->param("password");
+		my $killtrip=$query->param("killtrip");
+
+		edit_shit($num,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,$captcha,'',0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),$killtrip,0);
+
+		close TMPFILE;
+		unlink $tmpname;
+	}
 	
+	# Staff Management Subroutines
 	elsif ($task eq "createuser")
 	{
 		my $admin = $query->cookie("wakaadmin");
@@ -3725,9 +4127,14 @@ while ( $query = new CGI::Fast )
 		my @reign = $query->param("reign");
 		edit_user_account($admin,$management_password,$username,$newpassword,$newclass,$originalpassword,@reign);
 	}
+	elsif ($task eq "staffedits")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $num = $query->param("num");
+		show_staff_edit_history($admin,$num);
+	}
 	
 	# Staff Logging
-	
 	elsif ($task eq "stafflog")
 	{
 		my $admin = $query->cookie("wakaadmin");
@@ -3742,11 +4149,12 @@ while ( $query = new CGI::Fast )
 		my $perpage = $query->param("perpage");
 		make_staff_activity_panel($admin,$view,$user_to_view,$action_to_view,$ip_to_view,$post_to_view,$sortby,$order,$page,$perpage);
 	}
-	elsif ($task eq "staffedits")
+	
+	# Script Shutdown for FastCGI
+	elsif ($task eq "restart")
 	{
 		my $admin = $query->cookie("wakaadmin");
-		my $num = $query->param("num");
-		show_staff_edit_history($admin,$num);
+		restart_script($admin);
 	}
 	else
 	{
@@ -3755,7 +4163,59 @@ while ( $query = new CGI::Fast )
 	
 	$dbh->disconnect();
 	
+	# Automatically restart on script change
 	warn ("Script change detected of $ENV{SCRIPT_NAME}!") and last if -M $ENV{SCRIPT_FILENAME} < 0;
-	$count = 0 and last if $count > $maximum_allowed_loops; # Hoping this will help with memory leaks. fork() may be preferable
+	warn ("Script change detected of ".expand_filename('config.pl')."!") and last if -M 'config.pl' < 0;
 
+	$count = 0 and last if $count > $maximum_allowed_loops; # Hoping this will help with memory leaks. fork() may be preferable
+}
+
+#
+# Board Class
+# Handles properties of a particular board
+#
+
+# Constructor:
+# $board_object = Board->new("current_board_name");
+# Instance Methods:
+# $board_name = $board_object->path();
+# $silly_anonymous_option = $board_object->option('SILLY_ANONYMOUS');  
+
+package Board;
+
+my %options;
+
+sub new()
+{
+	my $self = shift;
+	my $board = shift;
+	bless \$board, $self;
+}
+
+sub option()
+{
+	my $board = shift;
+	my $option = shift;
+	
+	return $options{$$board}->{$option} if defined($options{$$board}); # Options already known? Return called option.
+	my $board_options_code;
+	
+	# Grab code from config file and evaluate.
+	open (BOARDCONF, './'.$$board.'/board_config.pl') or Main::make_error("Problem opening board configuration file.");
+	binmode BOARDCONF; # Needed for files using non-ASCII characters.
+	
+	my $board_options_code = do { local $/; <BOARDCONF> };
+
+	$options{$$board} = eval $board_options_code; # Set up hash.
+	
+	#main::make_error("There is an error in the board's configuration: $@") if ($@ or !%option);
+	die ("Board configuration error: ".$@) if $@;
+	
+	return $options{$$board}->{$option};
+}
+
+sub path()
+{
+	my $self = shift;
+	return $$self;
 }
