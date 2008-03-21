@@ -2556,7 +2556,7 @@ sub delete_all($$$)
 	while($row=$sth->fetchrow_hashref()) { push(@posts,$$row{num}); }
 	$sth->finish();
 
-	delete_stuff('',0,0,$admin,1,@posts);
+	delete_stuff('',0,0,$admin,1,0,@posts);
 }
 
 sub update_spam_file($$)
