@@ -1574,11 +1574,11 @@ sub process_file($$$$)
 		$thumbnail=$filename;
 	}
 
-	if($$filetypes{$ext}) # externally defined filetype - restore the name
+	if($$filetypes{$ext} && (($ext ne 'gif' && $ext ne 'jpg' && $ext ne 'png') || $$filetypes{$ext} eq '.')) # externally defined filetype - restore the name
 	{
 		my $newfilename=$uploadname;
 		$newfilename=~s!^.*[\\/]!!; # cut off any directory in filename
-		$newfilename=$board->option('IMG_DIR').$newfilename;
+		$newfilename=$board->path().'/'.$board->option('IMG_DIR').$newfilename;
 
 		unless(-e $newfilename) # verify no name clash
 		{
