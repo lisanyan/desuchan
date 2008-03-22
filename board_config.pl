@@ -134,7 +134,7 @@ $config{OEKAKI_DEFAULT_PAINTER} = "shi_norm";	# Default painter selection
 
 # Icons for filetypes - file extensions specified here will not be renamed, and will get icons
 # (except for the built-in image formats). These example icons can be found in the extras/ directory.
-$config{FILETYPES} => (
+$config{FILETYPES} = {
 #   # Audio files
 #	mp3 => 'icons/audio-mp3.png',
 #	ogg => 'icons/audio-ogg.png',
@@ -166,7 +166,7 @@ $config{FILETYPES} => (
 #	gif => '.',
 #	jpg => '.',
 #	png => '.',
-);
+};
 
 # no encoding; # Uncomment this if you uncommented the "use encoding" at the top of the file
 

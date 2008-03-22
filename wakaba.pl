@@ -1447,7 +1447,7 @@ sub get_file_size($)
 sub process_file($$$$)
 {
 	my ($file,$uploadname,$time,$parent)=@_;
-	my %filetypes=$board->option('FILETYPES');
+	my $filetypes=$board->option('FILETYPES');
 
 	# make sure to read file in binary mode on platforms that care about such things
 	binmode $file;
@@ -1455,7 +1455,7 @@ sub process_file($$$$)
 	# analyze file and check that it's in a supported format
 	my ($ext,$width,$height)=analyze_image($file,$uploadname);
 
-	my $known=($width or $filetypes{$ext});
+	my $known=($width or $$filetypes{$ext});
 
 	make_error(S_BADFORMAT) unless($board->option('ALLOW_UNKNOWN') or $known);
 	make_error(S_BADFORMAT) if(grep { $_ eq $ext } $board->option('FORBIDDEN_EXTENSIONS'));
@@ -1526,16 +1526,16 @@ sub process_file($$$$)
 
 	if(!$width) # unsupported file
 	{
-		if($filetypes{$ext}) # externally defined filetype
+		if($$filetypes{$ext}) # externally defined filetype
 		{
-			open THUMBNAIL,$board->path().'/'.$filetypes{$ext};
+			open THUMBNAIL,$board->path().'/'.$$filetypes{$ext};
 			binmode THUMBNAIL;
-			($tn_ext,$tn_width,$tn_height)=analyze_image(\*THUMBNAIL,$filetypes{$ext});
+			($tn_ext,$tn_width,$tn_height)=analyze_image(\*THUMBNAIL,$$filetypes{$ext});
 			close THUMBNAIL;
 
 			# was that icon file really there?
 			if(!$tn_width) { $thumbnail=undef }
-			else { $thumbnail=$filetypes{$ext} }
+			else { $thumbnail=$$filetypes{$ext} }
 		}
 		else
 		{
@@ -1574,7 +1574,7 @@ sub process_file($$$$)
 		$thumbnail=$filename;
 	}
 
-	if($filetypes{$ext}) # externally defined filetype - restore the name
+	if($$filetypes{$ext}) # externally defined filetype - restore the name
 	{
 		my $newfilename=$uploadname;
 		$newfilename=~s!^.*[\\/]!!; # cut off any directory in filename
@@ -3028,10 +3028,10 @@ sub get_page_count(;$)
 
 sub get_filetypes()
 {
-	my %filetypes=$board->option('FILETYPES');
-	$filetypes{gif}=$filetypes{jpg}=$filetypes{png}=1;
-	delete $filetypes{''}; # Yes, such a key can actually exist depending on how configuration is done. O lawd.
-	return join ", ",map { uc } sort keys %filetypes;
+	my $filetypes=$board->option('FILETYPES');
+	$$filetypes{gif}=$$filetypes{jpg}=$$filetypes{png}=1;
+	# delete $filetypes{''}; # Yes, such a key can actually exist depending on how configuration is done. O lawd.
+	return join ", ",map { uc } sort keys %$filetypes;
 }
 
 sub parse_range($$)
