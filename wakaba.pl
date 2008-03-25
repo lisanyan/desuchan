@@ -518,7 +518,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 		if($num)
 		{
 			# add staff log entry
-			add_log_entry($username,'admin_post',$board->path().','.$num,$date,$numip,0) if($admin_post eq 'yes');
+			add_log_entry($username,'admin_post',$board->path().','.$num,$date,$numip,0) if($admin_post_mode);
 			
 			build_thread_cache($num);
 			$parent = $num; # For use with "noko" below
@@ -1772,7 +1772,7 @@ sub make_admin_post_panel($)
 	my ($admin)=@_;
 	my ($sth,$row,@posts,$size,$rowtype);
 
-	my ($username, $type) = check_password($admin, 'mpost');
+	my ($username, $type) = check_password($admin, 'mpanel');
 	
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
