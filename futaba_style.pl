@@ -1001,8 +1001,8 @@ use constant STAFF_ACTIVITY_UNFILTERED => compile_template(MANAGER_HEAD_INCLUDE.
 		<tr class="row<var $rowtype>">
 			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
 			<td><if $account eq 'admin'>Administrator</if>
-			<if $account eq 'mod'>Moderator</if></td>
-			<if $type eq 'globmod'>Global Moderator</if>
+			<if $account eq 'mod'>Moderator</if>
+			<if $account eq 'globmod'>Global Moderator</if></td>
 			<td><var get_action_name($action)></td>
 			<td><var get_action_name($action,2)>: <var $info></td>
 			<td><var $date></td>
