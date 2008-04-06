@@ -2885,15 +2885,15 @@ sub edit_user_account($$$$$$@)
 	make_error("Cannot alter your own account class.") if ($newclass && $user_to_edit eq $username && $newclass ne $$row{account});
 	make_error("Cannot change your own reign.") if (@reign && join (" ", @reign) ne $$row{reign} && $user_to_edit eq $username);
 	
-	# Clear out unneeded changes
-	$newclass = '' if ($newclass eq $$row{account});
-	@reign = split (/ /, $$row{reign}) if (!@reign);
-	@reign = () if ($newclass && $newclass ne 'mod');
-	
 	# Users can change their own password, but not others' if they are without administrative rights.
 	make_error("Password incorrect.") if ($user_to_edit eq $username && hide_critical_data($originalpassword,SECRET) ne $$row{password});
 	# Management password required for promoting an account to the Administrator class or editing an existing Administrator account.
 	make_error("Management password incorrect.") if ((($$row{account} eq 'admin' && $user_to_edit ne $username) || ($newclass ne $$row{account} && $newclass eq 'admin')) && $management_password ne ADMIN_PASS);
+	
+	# Clear out unneeded changes
+	$newclass = '' if ($newclass eq $$row{account});
+	@reign = split (/ /, $$row{reign}) if (!@reign);
+	@reign = () if ($newclass && $newclass ne 'mod');
 	
 	if ($newpassword)
 	{
@@ -3656,8 +3656,16 @@ while ( $query = new CGI::Fast )
 	$dbh=DBI->connect(SQL_DBI_SOURCE,SQL_USERNAME,SQL_PASSWORD,{AutoCommit=>1}) or die S_SQLFAIL; 
 
 	my $board_name=($query->param("board"));
-	print ("Content-type: text/plain\n\nBoard not found.") and next if ((! -e './'.$board_name && $board_name ne '.glob') || !$board_name || $board_name eq "include");
-	print ("Content-type: text/plain\n\nBoard configuration not found.") and next if (! -e './'.$board_name.'/board_config.pl' && $board_name ne '.glob');
+	if ((! -e './'.$board_name && $board_name ne '.glob') || !$board_name || $board_name eq "include")
+	{
+		print ("Content-type: text/plain\n\nBoard not found.");
+		next;
+	}
+	if (! -e './'.$board_name.'/board_config.pl' && $board_name ne '.glob')
+	{
+		print ("Content-type: text/plain\n\nBoard configuration not found.");
+		next;
+	}
 	
 	$board = Board->new($board_name);
 
@@ -4212,6 +4220,8 @@ sub option()
 	die ("Board configuration error: ".$@) if $@;
 	
 	return $options{$$board}->{$option};
+	
+	close BOARDCONF;
 }
 
 sub path()
