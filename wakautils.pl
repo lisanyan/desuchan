@@ -1196,7 +1196,6 @@ sub make_thumbnail($$$$$;$)
 
 	$convert="convert" unless($convert);
 	`$convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality $magickname $thumbnail`;
-	warn "$convert -size ${width}x${height} -geometry ${width}x${height}! -quality $quality $magickname $thumbnail";
 
 	return 1 unless($? || -s $thumbnail == 0);
 

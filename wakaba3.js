@@ -9,9 +9,9 @@ function get_cookie(name)
 	}
 };
 
-function passfield(num) // Bring up Password Field for [Edit] and [Delete] Links
+function passfield(num,adminmode) // Bring up Password Field for [Edit] and [Delete] Links
 {
-	if (!document.getElementById('password'+num)) // If the field isn't present...
+	if (lastopenfield != num) // If the field isn't present...
 	{
 		// Collapse other fields
 		if (lastopenfield) { collapse_field(lastopenfield); }
@@ -27,14 +27,17 @@ function passfield(num) // Bring up Password Field for [Edit] and [Delete] Links
 		label.appendChild(bracket_left);
 		label.appendChild(checkbox);
 		label.appendChild(label_text);
-		
-		var field = document.createElement("input");
-		field.setAttribute("type","password");
-		field.setAttribute("id","password"+num);
-		field.setAttribute("name","postpassword");
-		field.setAttribute("size","8");
-		field.setAttribute("autocomplete","off"); // So much for standards compliance. -_- I RESERVE THE RIGHT TO HAVE A WEEABOO SMILEY HERE AS A SYMBOL OF MY FRUSTRATION
-		field.setAttribute("value", get_password("password"));
+
+		if (!adminmode)
+		{
+			var field = document.createElement("input");
+			field.setAttribute("type","password");
+			field.setAttribute("id","password"+num);
+			field.setAttribute("name","postpassword");
+			field.setAttribute("size","8");
+			field.setAttribute("autocomplete","off"); // So much for standards compliance. -_- I RESERVE THE RIGHT TO HAVE A WEEABOO SMILEY HERE AS A SYMBOL OF MY FRUSTRATION
+			field.setAttribute("value", get_password("password"));
+		}
 		
 		var spacer = document.createTextNode(" ");
 		
@@ -48,12 +51,19 @@ function passfield(num) // Bring up Password Field for [Edit] and [Delete] Links
 		hiddenInfo.setAttribute("name","deletepost");
 		hiddenInfo.setAttribute("value",num);
 		
+		var hiddenTask = document.createElement("input");
+		hiddenTask.setAttribute("type","hidden");
+		hiddenTask.setAttribute("name","task");
+		hiddenTask.setAttribute("value","Delete");
+		
 		var selectedspan = document.getElementById('delpostcontent'+num);
 		selectedspan.appendChild(label);
-		selectedspan.appendChild(field);
+		if (!adminmode)
+			selectedspan.appendChild(field);
 		selectedspan.appendChild(spacer);
 		selectedspan.appendChild(submit);
 		selectedspan.appendChild(hiddenInfo);	
+		selectedspan.appendChild(hiddenTask);	
 		
 		// This is now the current open delete field
 		lastopenfield = num;
@@ -207,7 +217,7 @@ function get_preferred_stylesheet()
 	return null;
 }
 
-function set_inputs(id) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!email.value) email.value=get_cookie("email"); if(!password.value) password.value=get_password("password"); } }
+function set_inputs(id,adminMode) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!email.value) email.value=get_cookie("email"); if(!adminMode) { if (!password.value) password.value=get_password("password"); } } } 
 function set_delpass(id) { with(document.getElementById(id)) {password.value=get_cookie("password"); } }
 
 

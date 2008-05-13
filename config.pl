@@ -27,6 +27,9 @@ use constant SQL_PASSWORD => 'CHANGEME';		# MySQL password
 #use constant MAX_FCGI_LOOPS => 250;
 #use constant TIME_OFFSET => 0;				# Time offset in seconds, for display on board pages. You can use this to adjust board time to your local time!
 							# Positive value adjusts forward; negative value adjusts backward.
+#use constant SQL_REPORT_TABLE => 'user_report';
+#use constant STAFF_LOG_RETENTION => 30*24*3600;	# How long should staff log entries be retained? (Seconds)
+#use constant REPORT_RETENTION => 30*24*3600;		# How long should report entries be retained? (Seconds)
 
 # no encoding;
 

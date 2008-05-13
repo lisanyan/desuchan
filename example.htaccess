@@ -27,3 +27,32 @@ RewriteEngine On
 RewriteCond %{HTTP_ACCEPT} application/xhtml\+xml
 RewriteRule \.html$ - [T=application/xhtml+xml;charset=utf-8]
 </IfModule>
+
+<Files wakaba.pl>
+# fcgid script
+AddHandler fcgid-script fcg fcgi fpl pl
+</Files>
+
+<IfModule mod_rewrite.c>
+RewriteEngine on
+# IE fix (blech)
+RewriteCond     %{HTTP_USER_AGENT}  MSIE        [NC]
+RewriteRule \.xhtml$ - [T=text/html;charset=utf-8]
+</IfModule>
+<IfModule mod_deflate.c>
+# I don't think it likes mod_deflate
+php_flag zlib.output_compression Off
+# Insert filter
+SetOutputFilter DEFLATE
+# Netscape 4.x has some problems...
+BrowserMatch ^Mozilla/4 gzip-only-text/html
+# Netscape 4.06-4.08 have some more problems
+BrowserMatch ^Mozilla/4\.0[678] no-gzip
+# MSIE masquerades as Netscape, but it is fine
+BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
+# Don't compress images
+SetEnvIfNoCase Request_URI \.(?:aac|avi|fla|flac|gif|jpe?g|m4a|mp3|mpc|ogg|png|swf|wma)$ no-gzip dont-vary
+# Make sure proxies don't deliver the wrong content
+Header append Vary User-Agent env=!dont-vary
+</IfModule>
+
