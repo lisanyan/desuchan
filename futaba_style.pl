@@ -611,7 +611,7 @@ use constant BAN_TEMPLATE => compile_template(q{
 
 use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 
-<span style="float:left">[<a href="<var expand_filename($board-\>option('HTML_SELF'))>"><const S_MANARET></a>]</span>
+<span style="float:left">[<a href="<var expand_filename($board-\>option('HTML_SELF'),1)>"><const S_MANARET></a>]</span>
 <if $admin>
 <div style="float:right;font-size:85%">
 	<span style="float:left;padding-left:2em">[<a href="<var $self>?task=mpanel&amp;board=<var $board-\>path()>"><const S_MANAPANEL></a>] </span>

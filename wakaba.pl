@@ -2591,7 +2591,7 @@ sub do_logout()
 {
 	make_cookies(wakaadmin=>"",-expires=>1);
 	make_cookies(wakaadminsave=>"",-expires=>1);
-	make_http_forward(get_secure_script_name()."?task=admin&board=".$board->path(),ALTERNATE_REDIRECT);
+	make_http_forward(get_script_name()."?task=admin&board=".$board->path(),ALTERNATE_REDIRECT);
 }
 
 #
@@ -3702,13 +3702,15 @@ sub get_stylesheets(;$) # Grab stylesheets for use in rendered pages
 	return \@stylesheets;
 }
 
-sub expand_filename($)
+sub expand_filename($;$)
 {
-	my ($filename)=@_;
+	my ($filename, $force_http)=@_;
 	return $filename if($filename=~m!^/!);
 	return $filename if($filename=~m!^\w+:!);
 
 	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
+	# If the optional argument is set to true value, force vanilla HTTP in place of SSL in case USE_SECURE_ADMIN is enabled
+	$self_path =~ s/^https\:/http\:/ if ($force_http);
 	my $board_path=$board->path().'/';
 	return $self_path.$board_path.$filename;
 }
