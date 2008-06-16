@@ -108,7 +108,7 @@ sub build_cache()
 	my $page=0;
 	
 	# grab all posts, in thread order, starting with the stickies
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN num ELSE parent END ASC, num ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` ORDER BY stickied DESC, lasthit DESC, CASE parent WHEN 0 THEN num ELSE parent END ASC, num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	$row=get_decoded_hashref($sth);
@@ -232,7 +232,7 @@ sub build_thread_cache($)
 	my ($sth,$row,@thread);
 	my ($filename,$tmpname);
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=? ORDER BY num ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=? ORDER BY num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute($thread,$thread) or make_error(S_SQLFAIL);
 
 	while($row=get_decoded_hashref($sth)) { push(@thread,$row); }
@@ -289,7 +289,7 @@ sub build_thread_cache_all()
 {
 	my ($sth,$row,@thread);
 
-	$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT num FROM `".$board->option('SQL_TABLE')."` WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	while($row=$sth->fetchrow_arrayref())
@@ -320,7 +320,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 	# check whether the parent thread is stickied
 	if ($parent)
 	{
-		my $selectsticky=$dbh->prepare("SELECT stickied, locked FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
+		my $selectsticky=$dbh->prepare("SELECT stickied, locked FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
 		$selectsticky->execute($parent) or make_error(S_SQLFAIL);
 		my $sticky_check = $selectsticky->fetchrow_hashref;
 	
@@ -368,7 +368,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 	
 	if ($sticky && $parent)
 	{
-		my $stickyupdate=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+		my $stickyupdate=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 		$stickyupdate->execute($parent, $parent) or make_error(S_SQLFAIL);
 		$stickyupdate->finish();
 	}
@@ -377,7 +377,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 	{
 		if ($parent)
 		{
-			my $lockupdate=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='yes' WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			my $lockupdate=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET locked='yes' WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$lockupdate->execute($parent, $parent) or make_error(S_SQLFAIL);
 			$lockupdate->finish();
 		}
@@ -510,7 +510,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 	$sticky = 0 if (!$sticky);
 	
 	# finally, write to the database
-	my $sth=$dbh->prepare("INSERT INTO ".$board->option('SQL_TABLE')." VALUES(null,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','',?,?,?);") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("INSERT INTO `".$board->option('SQL_TABLE')."` VALUES(null,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','',?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute($parent,$time,$lasthit,$numip,
 	$date,$name,$trip,$email,$subject,$password,$comment,
 	$filename,$size,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$admin_post,$sticky,$lock) or make_error(S_SQLFAIL);
@@ -520,7 +520,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 		# check for sage, or too many replies
 		unless($email=~/sage/i or sage_count($parent_res)>$board->option('MAX_RES'))
 		{
-			$sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET lasthit=$time WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET lasthit=$time WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$sth->execute($parent,$parent) or make_error(S_SQLFAIL);
 		}
 	}
@@ -537,12 +537,12 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 	{
 		if($filename)
 		{
-			$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE image=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT num FROM `".$board->option('SQL_TABLE')."` WHERE image=?;") or make_error(S_SQLFAIL);
 			$sth->execute($filename) or make_error(S_SQLFAIL);
 		}
 		else
 		{
-			$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE timestamp=? AND comment=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT num FROM `".$board->option('SQL_TABLE')."` WHERE timestamp=? AND comment=?;") or make_error(S_SQLFAIL);
 			$sth->execute($time,$comment) or make_error(S_SQLFAIL);
 		}
 		my $num=($sth->fetchrow_array())[0];
@@ -592,7 +592,7 @@ sub edit_window($$$$) # ADDED subroutine for creating the post-edit window
 {
 	my ($num, $password, $admin, $admin_editing_mode)=@_;
 	my @loop;
-	my $sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;");
+	my $sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=?;");
 	$sth->execute($num);
 	check_password($admin, 'mpanel', 1) if $admin;
 
@@ -695,7 +695,7 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 			# (This is done to lock-out users from editing something edited by a mod.)
 	
 	# Grab original information from the target post
-	my $select=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num = ?;");
+	my $select=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num = ?;");
 	$select->execute($num);
 	
 	my $row = get_decoded_hashref($select);
@@ -853,7 +853,7 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	 if($file)
 	 {
 		 my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
-		 my $filesth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=? WHERE num=?")
+		 my $filesth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=? WHERE num=?")
 		 	or make_error(S_SQLFAIL,1);
 		 $filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height, $num) or make_error(S_SQLFAIL);
 		 # now delete original files
@@ -866,7 +866,7 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	$select->finish(); 
 	
 	# finally, write to the database
-	my $sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET name=?,trip=?,subject=?,email=?,comment=?,lastedit=?,lastedit_ip=?,admin_post=? WHERE num=?;") or make_error(S_SQLFAIL,1);
+	my $sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET name=?,trip=?,subject=?,email=?,comment=?,lastedit=?,lastedit_ip=?,admin_post=? WHERE num=?;") or make_error(S_SQLFAIL,1);
 	$sth->execute($name,($trip || $killtrip) ? $trip : $$row{trip},$subject,$email,$comment,$date,$numip,$admin_post,$num) or make_error(S_SQLFAIL,1);
 
 	# update the cached HTML pages
@@ -899,13 +899,13 @@ sub sticky($$)
 	my ($username, $type) = check_password($admin, 'mpanel');
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
 
-	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT parent, stickied FROM `".$board->option('SQL_TABLE')."` WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_ALREADYSTICKIED) if $$row{stickied}; 
-		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+		my $update=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET stickied=1 WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
 	else
@@ -928,13 +928,13 @@ sub unsticky($$)
 	my ($username, $type) = check_password($admin, 'mpanel');
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
 	
-	my $sth=$dbh->prepare("SELECT parent, stickied FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT parent, stickied FROM `".$board->option('SQL_TABLE')."` WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_NOTSTICKIED) if !$$row{stickied}; 
-		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET stickied=0 WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET stickied=0 WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -958,13 +958,13 @@ sub lock_thread($$)
 	my ($username, $type) = check_password($admin, 'mpanel');
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
 	
-	my $sth=$dbh->prepare("SELECT parent, locked FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT parent, locked FROM `".$board->option('SQL_TABLE')."` WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 	if (!$$row{parent})
 	{
 		make_error(S_ALREADYLOCKED) if ($$row{locked} eq 'yes');
-		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='yes' WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET locked='yes' WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -988,14 +988,14 @@ sub unlock_thread($$)
 	my ($username, $type) = check_password($admin, 'mpanel');
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin);
 	
-	my $sth=$dbh->prepare("SELECT parent, locked FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT parent, locked FROM `".$board->option('SQL_TABLE')."` WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my $row=get_decoded_hashref($sth);
 
 	if (!$$row{parent})
 	{
 		make_error("String Already Unlocked.") if ($$row{locked} ne 'yes');
-		my $update=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET locked='' WHERE num=? OR parent=?;") 
+		my $update=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET locked='' WHERE num=? OR parent=?;") 
 			or make_error(S_SQLFAIL);
 		$update->execute($num, $num) or make_error(S_SQLFAIL);
 	}
@@ -1022,7 +1022,7 @@ sub is_whitelisted($)
 	my ($numip)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='whitelist' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".SQL_ADMIN_TABLE."` WHERE type='whitelist' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
 	$sth->execute($numip) or make_error(S_SQLFAIL);
 	my $ip_is_whitelisted = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -1036,7 +1036,7 @@ sub is_trusted($)
 {
 	my ($trip)=@_;
 	my ($sth);
-        $sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='trust' AND sval1 = ?;") or make_error(S_SQLFAIL);
+        $sth=$dbh->prepare("SELECT count(*) FROM `".SQL_ADMIN_TABLE."` WHERE type='trust' AND sval1 = ?;") or make_error(S_SQLFAIL);
         $sth->execute($trip) or make_error(S_SQLFAIL);
 	my $tripfag_is_trusted = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -1049,7 +1049,7 @@ sub is_trusted($)
 sub ban_admin_check($$)
 {
 	my ($ip, $admin) = @_;
-	my $sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT count(*) FROM `".SQL_ADMIN_TABLE."` WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
 	$sth->execute($ip) or make_error(S_SQLFAIL);
 	my $admin_is_banned = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -1062,18 +1062,18 @@ sub ban_check($$$$)
 	my ($numip,$name,$subject,$comment)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".SQL_ADMIN_TABLE."` WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
 	$sth->execute($numip) or make_error(S_SQLFAIL);
 
 	host_is_banned($numip) if (($sth->fetchrow_array())[0]);
 
 # fucking mysql...
-#	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_ADMIN_TABLE." WHERE type='wordban' AND ? LIKE '%' || sval1 || '%';") or make_error(S_SQLFAIL);
+#	$sth=$dbh->prepare("SELECT count(*) FROM `".SQL_ADMIN_TABLE."` WHERE type='wordban' AND ? LIKE '%' || sval1 || '%';") or make_error(S_SQLFAIL);
 #	$sth->execute($comment) or make_error(S_SQLFAIL);
 #
 #	make_error(S_STRREF) if(($sth->fetchrow_array())[0]);
 
-	$sth=$dbh->prepare("SELECT sval1 FROM ".SQL_ADMIN_TABLE." WHERE type='wordban';") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT sval1 FROM `".SQL_ADMIN_TABLE."` WHERE type='wordban';") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	my ($row, $badstring);
@@ -1098,7 +1098,7 @@ sub host_is_banned($) # subroutine for handling bans
 {
 	my $numip = $_[0];
 	
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT * FROM `".SQL_ADMIN_TABLE."` WHERE type='ipban' AND ? & ival2 = ival1 & ival2;") or make_error(S_SQLFAIL);
 	$sth->execute($numip) or make_error(S_SQLFAIL);
 	
 	my ($comment, $expiration);
@@ -1173,7 +1173,7 @@ sub flood_check($$$$$$)
 	{
 		# check for to quick file posts
 		$maxtime=$time-( ($report_check) ? (REPORT_RENZOKU) : ($board->option('RENZOKU2')));
-		$sth=$dbh->prepare("SELECT count(*) FROM ".(($report_check) ? SQL_REPORT_TABLE : $board->option('SQL_TABLE'))." WHERE ".($report_check ? "reporter=?" : "ip=?")." AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT count(*) FROM `".(($report_check) ? SQL_REPORT_TABLE : $board->option('SQL_TABLE'))."` WHERE ".($report_check ? "reporter=?" : "ip=?")." AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 		$sth->execute($ip) or make_error(S_SQLFAIL);
 		make_error(S_RENZOKU2) if(($sth->fetchrow_array())[0]);
 	}
@@ -1181,7 +1181,7 @@ sub flood_check($$$$$$)
 	{
 		# check for too quick replies or text-only posts
 		$maxtime=$time-( ($report_check) ? (REPORT_RENZOKU) : ($board->option('RENZOKU')));
-		$sth=$dbh->prepare("SELECT count(*) FROM ".(($report_check) ? SQL_REPORT_TABLE : $board->option('SQL_TABLE'))." WHERE ".($report_check ? "reporter=?" : "ip=?")." AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT count(*) FROM `".(($report_check) ? SQL_REPORT_TABLE : $board->option('SQL_TABLE'))."` WHERE ".($report_check ? "reporter=?" : "ip=?")." AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 		$sth->execute($ip) or make_error(S_SQLFAIL);
 		make_error(S_RENZOKU) if(($sth->fetchrow_array())[0]);
 
@@ -1189,7 +1189,7 @@ sub flood_check($$$$$$)
 		if ($no_repeat) # If the post is being edited, the comment field does not have to change.
 		{
 			$maxtime=$time-($board->option('RENZOKU3'));
-			$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE ip=? AND comment=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT count(*) FROM `".$board->option('SQL_TABLE')."` WHERE ip=? AND comment=? AND timestamp>$maxtime;") or make_error(S_SQLFAIL);
 			$sth->execute($ip,$comment) or make_error(S_SQLFAIL);
 			make_error(S_RENZOKU3) if(($sth->fetchrow_array())[0]);
 		}
@@ -1211,13 +1211,13 @@ sub proxy_check($)
 	proxy_clean();
 
 	# check if IP is from a known banned proxy
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_PROXY_TABLE." WHERE type='black' AND ip = ?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".SQL_PROXY_TABLE."` WHERE type='black' AND ip = ?;") or make_error(S_SQLFAIL);
 	$sth->execute($ip) or make_error(S_SQLFAIL);
 
 	make_error(S_BADHOSTPROXY) if(($sth->fetchrow_array())[0]);
 
 	# check if IP is from a known non-proxy
-	$sth=$dbh->prepare("SELECT count(*) FROM ".SQL_PROXY_TABLE." WHERE type='white' AND ip = ?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".SQL_PROXY_TABLE."` WHERE type='white' AND ip = ?;") or make_error(S_SQLFAIL);
 	$sth->execute($ip) or make_error(S_SQLFAIL);
 
         my $timestamp=time();
@@ -1225,13 +1225,13 @@ sub proxy_check($)
 
 	if(($sth->fetchrow_array())[0])
 	{	# known good IP, refresh entry
-		$sth=$dbh->prepare("UPDATE ".SQL_PROXY_TABLE." SET timestamp=?, date=? WHERE ip=?;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("UPDATE `".SQL_PROXY_TABLE."` SET timestamp=?, date=? WHERE ip=?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp,$date,$ip) or make_error(S_SQLFAIL);
 	}
 	else
 	{	# unknown IP, check for proxy
 		my $command = $board->option('PROXY_COMMAND') . " " . $ip;
-		$sth=$dbh->prepare("INSERT INTO ".SQL_PROXY_TABLE." VALUES(null,?,?,?,?);") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("INSERT INTO `".SQL_PROXY_TABLE."` VALUES(null,?,?,?,?);") or make_error(S_SQLFAIL);
 
 		if(`$command`)
 		{
@@ -1271,11 +1271,11 @@ sub add_proxy_entry($$$$$)
 	}	
 
 	# This is to ensure user doesn't put multiple entries for the same IP
-	$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE ip=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("DELETE FROM `".SQL_PROXY_TABLE."` WHERE ip=?;") or make_error(S_SQLFAIL);
 	$sth->execute($ip) or make_error(S_SQLFAIL);
 
 	# Add requested entry
-	$sth=$dbh->prepare("INSERT INTO ".SQL_PROXY_TABLE." VALUES(null,?,?,?,?);") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("INSERT INTO `".SQL_PROXY_TABLE."` VALUES(null,?,?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute($type,$ip,$timestamp,$date) or make_error(S_SQLFAIL);
 	$sth->finish();
 
@@ -1289,17 +1289,17 @@ sub proxy_clean()
 	if($board->option('PROXY_BLACK_AGE') == $board->option('PROXY_WHITE_AGE'))
 	{
 		$timestamp = time() - $board->option('PROXY_BLACK_AGE');
-		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE timestamp<?;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("DELETE FROM `".SQL_PROXY_TABLE."` WHERE timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 	} 
 	else
 	{
 		$timestamp = time() - $board->option('PROXY_BLACK_AGE');
-		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE type='black' AND timestamp<?;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("DELETE FROM `".SQL_PROXY_TABLE."` WHERE type='black' AND timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 
 		$timestamp = time() - $board->option('PROXY_WHITE_AGE');
-		$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE type='white' AND timestamp<?;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("DELETE FROM `".SQL_PROXY_TABLE."` WHERE type='white' AND timestamp<?;") or make_error(S_SQLFAIL);
 		$sth->execute($timestamp) or make_error(S_SQLFAIL);
 	}
 	
@@ -1316,7 +1316,7 @@ sub remove_proxy_entry($$)
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	$sth=$dbh->prepare("DELETE FROM ".SQL_PROXY_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("DELETE FROM `".SQL_PROXY_TABLE."` WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	$sth->finish();
 
@@ -1439,7 +1439,7 @@ sub get_post($)
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = $sth->fetchrow_hashref();
 	$sth->finish();
@@ -1452,7 +1452,7 @@ sub get_parent_post($)
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = $sth->fetchrow_hashref();
 	$sth->finish();
@@ -1465,7 +1465,7 @@ sub sage_count($)
 	my ($parent)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE parent=? AND NOT ( timestamp<? AND ip=? );") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".$board->option('SQL_TABLE')."` WHERE parent=? AND NOT ( timestamp<? AND ip=? );") or make_error(S_SQLFAIL);
 	$sth->execute($$parent{num},$$parent{timestamp}+($board->option('NOSAGE_WINDOW')),$$parent{ip}) or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -1550,12 +1550,12 @@ sub process_file($$$$)
 		
 		if ($board->option('DUPLICATE_DETECTION') eq 'thread') # Check dupes in same thread
 		{
-			$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE md5=? AND (parent=? OR num=?);") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE md5=? AND (parent=? OR num=?);") or make_error(S_SQLFAIL);
 			$sth->execute($md5, $parent, $parent) or make_error(S_SQLFAIL);
 		}
 		else # Check dupes throughout board
 		{
-			$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE md5=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE md5=?;") or make_error(S_SQLFAIL);
 			$sth->execute($md5) or make_error(S_SQLFAIL);
 		}
 		
@@ -1685,7 +1685,7 @@ sub delete_stuff($$$$$$@)
 			add_log_entry($username,'admin_delete',$board->path().','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0,time());
 			if ($caller ne 'internal') # If not called by mark_resolved() itself...
 			{
-				my $reportcheck = $dbh->prepare("SELECT * FROM ".SQL_REPORT_TABLE." WHERE postnum=? AND resolved=0 LIMIT 1");
+				my $reportcheck = $dbh->prepare("SELECT * FROM `".SQL_REPORT_TABLE."` WHERE postnum=? AND resolved=0 LIMIT 1");
 				$reportcheck->execute($post);
 				my $current_board_name = $board->path();
 				mark_resolved($admin,'','internal',($current_board_name=>[$post])) if (($reportcheck->fetchrow_array())[0]);
@@ -1714,7 +1714,7 @@ sub delete_post($$$$)
 	my $src=$board->option('IMG_DIR');
 	my $postinfo;
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($post) or make_error(S_SQLFAIL);
 
 	if($row=$sth->fetchrow_hashref())
@@ -1725,7 +1725,7 @@ sub delete_post($$$$)
 		unless($fileonly)
 		{
 			# remove files from comment and possible replies
-			$sth=$dbh->prepare("SELECT image,thumbnail FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=?") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT image,thumbnail FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?") or make_error(S_SQLFAIL);
 			$sth->execute($post,$post) or make_error(S_SQLFAIL);
 
 			while($res=$sth->fetchrow_hashref())
@@ -1747,7 +1747,7 @@ sub delete_post($$$$)
 			}
 
 			# remove post and possible replies
-			$sth=$dbh->prepare("DELETE FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("DELETE FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
 			$sth->execute($post,$post) or make_error(S_SQLFAIL);
 		}
 		else # remove just the image and update the database
@@ -1760,7 +1760,7 @@ sub delete_post($$$$)
 				unlink $board->path.'/'.$$row{image};
 				unlink $board->path.'/'.$$row{thumbnail} if($$row{thumbnail}=~/^$thumb/);
 
-				$sth=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET size=0,md5=null,thumbnail=null WHERE num=?;") or make_error(S_SQLFAIL);
+				$sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET size=0,md5=null,thumbnail=null WHERE num=?;") or make_error(S_SQLFAIL);
 				$sth->execute($post) or make_error(S_SQLFAIL);
 			}
 		}
@@ -1842,7 +1842,7 @@ sub make_admin_post_panel($$)
 	if ($page =~ /^t\w+$/)
 	{
 		$page =~ s/^t//g;
-		$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num=? OR parent=? ORDER BY lasthit DESC, num ASC;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=? ORDER BY lasthit DESC, num ASC;") or make_error(S_SQLFAIL);
 		$sth->execute($page,$page) or make_error(S_SQLFAIL);
 		
 		$row = get_decoded_hashref($sth);
@@ -1883,7 +1883,7 @@ sub make_admin_post_panel($$)
 		my $thread_offset = $page * ($board->option('IMAGES_PER_PAGE'));
 		
 		# Grab the parent posts
-		$sth=$dbh->prepare("SELECT ".$board->option('SQL_TABLE').".* FROM ".$board->option('SQL_TABLE')." WHERE parent=0 ORDER BY stickied DESC, lasthit DESC, ".$board->option('SQL_TABLE').".num ASC LIMIT ".$board->option('IMAGES_PER_PAGE')." OFFSET $thread_offset;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT `".$board->option('SQL_TABLE')."`.* FROM `".$board->option('SQL_TABLE')."` WHERE parent=0 ORDER BY stickied DESC, lasthit DESC, `".$board->option('SQL_TABLE')."`.num ASC LIMIT ".$board->option('IMAGES_PER_PAGE')." OFFSET $thread_offset;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 		
 		# Grab the thread posts in each thread
@@ -1893,7 +1893,7 @@ sub make_admin_post_panel($$)
 			my $threadnumber = $$row{num};
 			
 			# Grab thread replies
-			my $postcountquery=$dbh->prepare("SELECT COUNT(*) AS count, COUNT(image) AS imgcount FROM ".$board->option('SQL_TABLE')." WHERE parent=?") or make_error(S_SQLFAIL);
+			my $postcountquery=$dbh->prepare("SELECT COUNT(*) AS count, COUNT(image) AS imgcount FROM `".$board->option('SQL_TABLE')."` WHERE parent=?") or make_error(S_SQLFAIL);
 			$postcountquery->execute($threadnumber) or make_error(S_SQLFAIL);
 			my $postcountrow = $postcountquery->fetchrow_hashref();
 			my $postcount = $$postcountrow{count};
@@ -1905,7 +1905,7 @@ sub make_admin_post_panel($$)
 			my $limit = $board->option('REPLIES_PER_THREAD');
 			my $shownimages = 0;
 			
-			my $threadquery=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=? ORDER BY stickied DESC, lasthit DESC, ".$board->option('SQL_TABLE').".num ASC LIMIT $limit OFFSET $offset;") or make_error(S_SQLFAIL);
+			my $threadquery=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=? ORDER BY stickied DESC, lasthit DESC, `".$board->option('SQL_TABLE')."`.num ASC LIMIT $limit OFFSET $offset;") or make_error(S_SQLFAIL);
 			$threadquery->execute($threadnumber) or make_error(S_SQLFAIL);
 			while (my $inner_row=get_decoded_hashref($threadquery))
 			{
@@ -1960,7 +1960,7 @@ sub make_admin_ban_panel($$)
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	$sth=$dbh->prepare("SELECT ".SQL_ADMIN_TABLE.".*, ".SQL_STAFFLOG_TABLE.".username FROM ".SQL_ADMIN_TABLE." LEFT OUTER JOIN ".SQL_STAFFLOG_TABLE." ON ".SQL_ADMIN_TABLE.".num=".SQL_STAFFLOG_TABLE.".admin_id AND ".SQL_ADMIN_TABLE.".type=".SQL_STAFFLOG_TABLE.".action WHERE type='ipban' OR type='wordban' OR type='whitelist' OR type='trust' ORDER BY type ASC,num ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT `".SQL_ADMIN_TABLE."`.*, `".SQL_STAFFLOG_TABLE."`.username FROM `".SQL_ADMIN_TABLE."` LEFT OUTER JOIN `".SQL_STAFFLOG_TABLE."` ON `".SQL_ADMIN_TABLE."`.num=`".SQL_STAFFLOG_TABLE."`.admin_id AND `".SQL_ADMIN_TABLE."`.type=`".SQL_STAFFLOG_TABLE."`.action WHERE type='ipban' OR type='wordban' OR type='whitelist' OR type='trust' ORDER BY type ASC,num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	while($row=get_decoded_hashref($sth))
 	{
@@ -2026,14 +2026,14 @@ sub ban_thread($$$$$$)
 	my ($username, $type) = check_password($admin, 'bans');
 	my (%posts);
 	
-	my $sth=$dbh->prepare("SELECT parent FROM ".$board->option('SQL_TABLE')." WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL,1);
+	my $sth=$dbh->prepare("SELECT parent FROM `".$board->option('SQL_TABLE')."` WHERE num=? LIMIT 1;") or make_error(S_SQLFAIL,1);
 	$sth->execute($num) or make_error(S_SQLFAIL,1);
 	my $row=$sth->fetchrow_hashref();
 	$sth->finish();
 	
 	if (!$$row{parent})
 	{
-		my $ban_list = $dbh->prepare("SELECT ip FROM ".$board->option('SQL_TABLE')." WHERE parent=? OR num=? LIMIT 1;") or make_error(S_SQLFAIL);
+		my $ban_list = $dbh->prepare("SELECT ip FROM `".$board->option('SQL_TABLE')."` WHERE parent=? OR num=? LIMIT 1;") or make_error(S_SQLFAIL);
 		$ban_list->execute($num,$num);
 		while (my $banned_ip=($ban_list->fetchrow_array())[0])
 		{
@@ -2061,7 +2061,7 @@ sub make_admin_ban_edit($$) # generating ban editing window
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 	
 	my (@hash, $time);
-	my $sth = $dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE num=?") or make_error(S_SQLFAIL);
+	my $sth = $dbh->prepare("SELECT * FROM `".SQL_ADMIN_TABLE."` WHERE num=?") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	my @utctime;
 	while (my $row=get_decoded_hashref($sth))
@@ -2093,7 +2093,7 @@ sub make_admin_proxy_panel($)
 
 	proxy_clean();
 
-	$sth=$dbh->prepare("SELECT * FROM ".SQL_PROXY_TABLE." ORDER BY timestamp ASC;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".SQL_PROXY_TABLE."` ORDER BY timestamp ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	while($row=get_decoded_hashref($sth))
 	{
@@ -2141,11 +2141,11 @@ sub make_sql_dump($)
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE').";") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."`;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	while($row=get_decoded_arrayref($sth))
 	{
-		push @database,"INSERT INTO ".$board->option('SQL_TABLE')." VALUES('".
+		push @database,"INSERT INTO `".$board->option('SQL_TABLE')."` VALUES('".
 		(join "','",map { s/\\/&#92;/g; $_ } @{$row}). # escape ' and \, and join up all values with commas and apostrophes
 		"');";
 	}
@@ -2247,7 +2247,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	
 	# Grab Staff Info
 	
-	my $staff_get = $dbh->prepare("SELECT username FROM ".SQL_ACCOUNT_TABLE.";");
+	my $staff_get = $dbh->prepare("SELECT username FROM `".SQL_ACCOUNT_TABLE."`;");
 	$staff_get->execute();
 	while (my $staff_row = get_decoded_hashref($staff_get))
 	{
@@ -2261,13 +2261,13 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	{
 		make_error("Please select a user to view.") if (!$user_to_view);
 		
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE username=?;");
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."` WHERE username=?;");
 		$count_get->execute($user_to_view) or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 		$count_get->finish();
 		
-		my $sth=$dbh->prepare("SELECT * FROM ".SQL_STAFFLOG_TABLE." WHERE username=? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		my $sth=$dbh->prepare("SELECT * FROM `".SQL_STAFFLOG_TABLE."` WHERE username=? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 		$sth->execute($user_to_view) or make_error(S_SQLFAIL);
 	
 		my $rowtype = 1;
@@ -2292,14 +2292,14 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		
 		my ($action_name, $action_content) = get_action_name($action_to_view,1);
 
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE action=?;");
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."` WHERE action=?;");
 		$count_get->execute($action_to_view) or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	
 		$count_get->finish();
 		
-		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username WHERE ".SQL_STAFFLOG_TABLE.".action=? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT `".SQL_ACCOUNT_TABLE."`.username,`".SQL_ACCOUNT_TABLE."`.account,`".SQL_ACCOUNT_TABLE."`.disabled,`".SQL_STAFFLOG_TABLE."`.info,`".SQL_STAFFLOG_TABLE."`.date,`".SQL_STAFFLOG_TABLE."`.ip FROM `".SQL_STAFFLOG_TABLE."` LEFT JOIN `".SQL_ACCOUNT_TABLE."` ON `".SQL_STAFFLOG_TABLE."`.username=`".SQL_ACCOUNT_TABLE."`.username WHERE `".SQL_STAFFLOG_TABLE."`.action=? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 		$sth->execute($action_to_view) or make_error(S_SQLFAIL);
 
 		my $rowtype=1;
@@ -2322,14 +2322,14 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	{
 		make_error("Invalid IP Address.") if $ip_to_view !~ /^\d+\.\d+\.\d+\.\d+$/;
 		
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info LIKE ?;");
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."` WHERE info LIKE ?;");
 		$count_get->execute('%'.$ip_to_view.'%') or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	
 		$count_get->finish();
 		
-		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".action,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username WHERE info LIKE ? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT `".SQL_ACCOUNT_TABLE."`.username,`".SQL_ACCOUNT_TABLE."`.account,`".SQL_ACCOUNT_TABLE."`.disabled,`".SQL_STAFFLOG_TABLE."`.action,`".SQL_STAFFLOG_TABLE."`.info,`".SQL_STAFFLOG_TABLE."`.date,`".SQL_STAFFLOG_TABLE."`.ip FROM `".SQL_STAFFLOG_TABLE."` LEFT JOIN `".SQL_ACCOUNT_TABLE."` ON `".SQL_STAFFLOG_TABLE."`.username=`".SQL_ACCOUNT_TABLE."`.username WHERE info LIKE ? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 		$sth->execute('%'.$ip_to_view.'%') or make_error(S_SQLFAIL);
 	
 		my $rowtype = 1;
@@ -2352,14 +2352,14 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	{
 		$post_to_view = $board->path().','.$post_to_view if $post_to_view !~ /,/;
 		
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE." WHERE info LIKE ?;");
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."` WHERE info LIKE ?;");
 		$count_get->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	
 		$count_get->finish();
 		
-		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".action,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username WHERE info LIKE ? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT `".SQL_ACCOUNT_TABLE."`.username,`".SQL_ACCOUNT_TABLE."`.account,`".SQL_ACCOUNT_TABLE."`.disabled,`".SQL_STAFFLOG_TABLE."`.action,`".SQL_STAFFLOG_TABLE."`.info,`".SQL_STAFFLOG_TABLE."`.date,`".SQL_STAFFLOG_TABLE."`.ip FROM `".SQL_STAFFLOG_TABLE."` LEFT JOIN `".SQL_ACCOUNT_TABLE."` ON `".SQL_STAFFLOG_TABLE."`.username=`".SQL_ACCOUNT_TABLE."`.username WHERE info LIKE ? $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 		$sth->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
 	
 		my $rowtype = 1;
@@ -2380,14 +2380,14 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	}
 	else
 	{
-		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM ".SQL_STAFFLOG_TABLE.";");
+		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."`;");
 		$count_get->execute or make_error(S_SQLFAIL);
 		my $count = ($count_get->fetchrow_array())[0];
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	
 		$count_get->finish();
 		
-		my $sth = $dbh->prepare("SELECT ".SQL_ACCOUNT_TABLE.".username,".SQL_ACCOUNT_TABLE.".account,".SQL_ACCOUNT_TABLE.".disabled,".SQL_STAFFLOG_TABLE.".action,".SQL_STAFFLOG_TABLE.".info,".SQL_STAFFLOG_TABLE.".date,".SQL_STAFFLOG_TABLE.".ip FROM ".SQL_STAFFLOG_TABLE." LEFT JOIN ".SQL_ACCOUNT_TABLE." ON ".SQL_STAFFLOG_TABLE.".username=".SQL_ACCOUNT_TABLE.".username $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT `".SQL_ACCOUNT_TABLE."`.username,`".SQL_ACCOUNT_TABLE."`.account,`".SQL_ACCOUNT_TABLE."`.disabled,`".SQL_STAFFLOG_TABLE."`.action,`".SQL_STAFFLOG_TABLE."`.info,`".SQL_STAFFLOG_TABLE."`.date,`".SQL_STAFFLOG_TABLE."`.ip FROM `".SQL_STAFFLOG_TABLE."` LEFT JOIN `".SQL_ACCOUNT_TABLE."` ON `".SQL_STAFFLOG_TABLE."`.username=`".SQL_ACCOUNT_TABLE."`.username $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 	
 		my $rowtype = 1;
@@ -2416,7 +2416,7 @@ sub show_staff_edit_history($$)
 	my ($username,$type) = check_password($admin, '', 1);
 	my @edits;
 	
-	my $sth = $dbh->prepare("SELECT ".SQL_STAFFLOG_TABLE.".username,".SQL_STAFFLOG_TABLE.".date FROM ".SQL_STAFFLOG_TABLE." INNER JOIN ".$board->option('SQL_TABLE')." ON ".SQL_STAFFLOG_TABLE.".info=CONCAT('".$board->option('SQL_TABLE').",',".$board->option('SQL_TABLE').".num) WHERE ".$board->option('SQL_TABLE').".num=? AND ".SQL_STAFFLOG_TABLE.".action='admin_edit' ORDER BY ".SQL_STAFFLOG_TABLE.".date DESC;") or make_error(S_SQLFAIL);
+	my $sth = $dbh->prepare("SELECT `".SQL_STAFFLOG_TABLE."`.username,`".SQL_STAFFLOG_TABLE."`.date FROM `".SQL_STAFFLOG_TABLE."` INNER JOIN `".$board->option('SQL_TABLE')."` ON `".SQL_STAFFLOG_TABLE."`.info=CONCAT('".$board->option('SQL_TABLE').",',`".$board->option('SQL_TABLE')."`.num) WHERE `".$board->option('SQL_TABLE')."`.num=? AND `".SQL_STAFFLOG_TABLE."`.action='admin_edit' ORDER BY `".SQL_STAFFLOG_TABLE."`.date DESC;") or make_error(S_SQLFAIL);
 	$sth->execute($num);
 	
 	while(my $row=$sth->fetchrow_hashref())
@@ -2487,7 +2487,7 @@ sub search_posts($$$$$$)
 		
 		# Construct counting query
 		
-		$sth=$dbh->prepare('SELECT COUNT(*) FROM '.$board->option('SQL_TABLE').' WHERE ip=? ORDER BY num DESC;') or make_error(S_SQLFAIL,$popup);
+		$sth=$dbh->prepare('SELECT COUNT(*) FROM `'.$board->option('SQL_TABLE').'` WHERE ip=? ORDER BY num DESC;') or make_error(S_SQLFAIL,$popup);
 		$sth->execute($numip) or make_error(S_SQLFAIL,$popup);
 		$count=($sth->fetchrow_array)[0];
 		make_error("No posts found for specified IP address ($query_string).",$popup) if (!$count);
@@ -2504,7 +2504,7 @@ sub search_posts($$$$$$)
 		
 		# Construct content query
 		
-		$sth=$dbh->prepare('SELECT * FROM '.$board->option('SQL_TABLE')." WHERE ip=? ORDER BY num DESC LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL,$popup);
+		$sth=$dbh->prepare('SELECT * FROM `'.$board->option('SQL_TABLE')."` WHERE ip=? ORDER BY num DESC LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL,$popup);
 		$sth->execute($numip) or make_error(S_SQLFAIL,$popup);
 		
 		my $entry_number = $offset + 1;
@@ -2526,7 +2526,7 @@ sub search_posts($$$$$$)
 		
 		# Construct query
 		
-		$sth=$dbh->prepare('SELECT * FROM '.$board->option('SQL_TABLE').' WHERE num=? LIMIT 1') or make_error(S_SQLFAIL,$popup);
+		$sth=$dbh->prepare('SELECT * FROM `'.$board->option('SQL_TABLE').'` WHERE num=? LIMIT 1') or make_error(S_SQLFAIL,$popup);
 		$sth->execute($query_string) or make_error(S_SQLFAIL,$popup);
 		
 		# Grab the single post we need.
@@ -2553,7 +2553,7 @@ sub do_login($$$$$)
 	my $crypt;
 	my @adminarray = split (/,/, $admincookie) if $admincookie;
 	
-	my $sth=$dbh->prepare("SELECT password,account,username FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT password,account,username FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute(($username || !$admincookie) ? $username : $adminarray[0]) or make_error(S_SQLFAIL);
 	my $row=$sth->fetchrow_hashref();
 	$sth->finish();
@@ -2604,7 +2604,7 @@ sub check_password($$;$)
 	
 	my @adminarray = split (/,/, $admin); # <user>,rc6(<password+hostname>)
 	
-	my $sth=$dbh->prepare("SELECT password, username, account, disabled, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT password, username, account, disabled, reign FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($adminarray[0]) or make_error(S_SQLFAIL);
 
 	my $row=$sth->fetchrow_hashref();
@@ -2712,7 +2712,7 @@ sub add_admin_entry($$$$$$$$$)
 	
 	make_error(S_STRINGFIELDMISSING) if ($type eq 'wordban' && $sval1 eq '');
 
-	$sth=$dbh->prepare("INSERT INTO ".SQL_ADMIN_TABLE." VALUES(null,?,?,?,?,?,?,?);") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("INSERT INTO `".SQL_ADMIN_TABLE."` VALUES(null,?,?,?,?,?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute($type,$comment,$ival1,$ival2,$sval1,$total,$expiration) or make_error(S_SQLFAIL);
 	
 	if ($total eq 'yes' && $type eq 'ipban')
@@ -2723,7 +2723,7 @@ sub add_admin_entry($$$$$$$$$)
 	$sth->finish();
 	
 	# Grab entry number
-	my $select=$dbh->prepare("SELECT num FROM ".SQL_ADMIN_TABLE." WHERE type=? AND comment=? AND ival1=? AND ival2=? AND sval1=?;") or make_error(S_SQLFAIL);
+	my $select=$dbh->prepare("SELECT num FROM `".SQL_ADMIN_TABLE."` WHERE type=? AND comment=? AND ival1=? AND ival2=? AND sval1=?;") or make_error(S_SQLFAIL);
 	$select->execute($type,$comment,$ival1,$ival2,$sval1) or make_error(S_SQLFAIL);
 	
 	my $row = $select->fetchrow_hashref;
@@ -2748,7 +2748,7 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
 	# Sanity check
-	my $verify=$dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE num=?") or make_error(S_SQLFAIL);
+	my $verify=$dbh->prepare("SELECT * FROM `".SQL_ADMIN_TABLE."` WHERE num=?") or make_error(S_SQLFAIL);
 	$verify->execute($num) or make_error(S_SQLFAIL);
 	my $row = get_decoded_hashref($verify);
 	make_error("Entry has not created or was removed.") if !$row;
@@ -2782,7 +2782,7 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	}
 	
 	# Revise database entry
-	$sth=$dbh->prepare("UPDATE ".SQL_ADMIN_TABLE." SET comment=?, ival1=?, ival2=?, sval1=?, total=?, expiration=? WHERE num=?")  
+	$sth=$dbh->prepare("UPDATE `".SQL_ADMIN_TABLE."` SET comment=?, ival1=?, ival2=?, sval1=?, total=?, expiration=? WHERE num=?")  
 		or make_error(S_SQLFAIL);
 	$sth->execute($comment, dot_to_dec($ival1), dot_to_dec($ival2), $sval1, $total, $expiration, $num) or make_error(S_SQLFAIL);
 	$sth->finish;
@@ -2803,7 +2803,7 @@ sub remove_admin_entry($$$$)
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR})) || $override;
 	
 	# Does the ban forbid browsing?
-	my $totalverify_admin = $dbh->prepare("SELECT * FROM ".SQL_ADMIN_TABLE." WHERE num=?") or make_error(S_SQLFAIL);
+	my $totalverify_admin = $dbh->prepare("SELECT * FROM `".SQL_ADMIN_TABLE."` WHERE num=?") or make_error(S_SQLFAIL);
 	$totalverify_admin->execute($num) or make_error(S_SQLFAIL);
 	while (my $row=get_decoded_hashref($totalverify_admin))
 	{
@@ -2818,7 +2818,7 @@ sub remove_admin_entry($$$$)
 	}
 	$totalverify_admin->finish();
 	
-	my $sth=$dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE num=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("DELETE FROM `".SQL_ADMIN_TABLE."` WHERE num=?;") or make_error(S_SQLFAIL);
 	$sth->execute($num) or make_error(S_SQLFAIL);
 	$sth->finish();
 
@@ -2828,7 +2828,7 @@ sub remove_admin_entry($$$$)
 sub remove_ban_on_admin($)
 {
 	my ($admin) = @_;
-	my $sth=$dbh->prepare("SELECT num FROM ".SQL_ADMIN_TABLE." WHERE ? & ival2 = ival1 & ival2") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT num FROM `".SQL_ADMIN_TABLE."` WHERE ? & ival2 = ival1 & ival2") or make_error(S_SQLFAIL);
 	$sth->execute(dot_to_dec($ENV{REMOTE_ADDR})) or make_error(S_SQLFAIL);
 	my @rows_to_delete;
 	while (my $row=get_decoded_hashref($sth))
@@ -2857,7 +2857,7 @@ sub delete_all($$$$)
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
 	# Issue SQL query
-	$sth=$dbh->prepare("SELECT num FROM ".$board->option('SQL_TABLE')." WHERE ip & ? = ? & ?;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT num FROM `".$board->option('SQL_TABLE')."` WHERE ip & ? = ? & ?;") or make_error(S_SQLFAIL);
 	$sth->execute($mask,$ip,$mask) or make_error(S_SQLFAIL);
 	while($row=$sth->fetchrow_hashref()) { push(@posts,$$row{num}); }
 	$sth->finish();
@@ -2906,7 +2906,7 @@ sub do_nuke_database($$)
 	unlink glob $board->path().'/'.board->option('THUMB_DIR').'*';
 	unlink glob $board->path().'/'.board->option('RES_DIR').'*';
 	
-	build_cache();
+	# build_cache();
 
 	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
 }
@@ -2970,7 +2970,7 @@ sub manage_staff($)
 		
 	make_error("Insufficient privledges.") if ($type ne 'admin'); 
 
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." ORDER BY account ASC,username ASC;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT * FROM `".SQL_ACCOUNT_TABLE."` ORDER BY account ASC,username ASC;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	my $rowtype=1;
@@ -2980,7 +2980,7 @@ sub manage_staff($)
 		$$row{rowtype}=$rowtype;
 		
 		# Grab the latest action for each user.
-		my $latestaction = $dbh->prepare("SELECT action,date FROM ".SQL_STAFFLOG_TABLE." WHERE username=? ORDER BY date DESC LIMIT 1;") or make_error(S_SQLFAIL);
+		my $latestaction = $dbh->prepare("SELECT action,date FROM `".SQL_STAFFLOG_TABLE."` WHERE username=? ORDER BY date DESC LIMIT 1;") or make_error(S_SQLFAIL);
 		$latestaction->execute($$row{username});
 		
 		my $actionrow=$latestaction->fetchrow_hashref();
@@ -3009,7 +3009,7 @@ sub make_remove_user_account_window($$)
 	make_error("No username specified.") if (!$user_to_delete); 
 	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
 
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3030,7 +3030,7 @@ sub remove_user_account($$$)
 	make_error("No username specified.") if (!$user_to_delete); 
 	make_error("An Hero Mode not available.") if ($user_to_delete eq $username);
 	
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_delete) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3039,7 +3039,7 @@ sub remove_user_account($$$)
 	
 	$sth->finish();
 	
-	my $deletion=$dbh->prepare("DELETE FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $deletion=$dbh->prepare("DELETE FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$deletion->execute($user_to_delete) or make_error(S_SQLFAIL);
 	$deletion->finish();
 	
@@ -3055,7 +3055,7 @@ sub make_disable_user_account_window($$)
 	make_error("No username specified.") if (!$user_to_disable); 
 	make_error("Give me back the razor, emo kid.") if ($user_to_disable eq $username);
 
-	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account,disabled FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3078,7 +3078,7 @@ sub disable_user_account($$$)
 	make_error("Give me back the razor, emo kid.") if ($username eq $user_to_disable);
 	make_error("Insufficient privledges.") if ($type ne 'admin');
 	
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_disable) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3087,7 +3087,7 @@ sub disable_user_account($$$)
 	
 	$sth->finish();
 	
-	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='1' WHERE username=?;") or make_error(S_SQLFAIL);
+	my $disable=$dbh->prepare("UPDATE `".SQL_ACCOUNT_TABLE."` SET disabled='1' WHERE username=?;") or make_error(S_SQLFAIL);
 	$disable->execute($user_to_disable) or make_error(S_SQLFAIL);
 	$disable->finish();
 	
@@ -3099,7 +3099,7 @@ sub make_enable_user_account_window($$)
 	my ($admin,$user_to_enable) = @_;
 	my ($username, $type) = check_password($admin, 'staff');
 	
-	my $sth=$dbh->prepare("SELECT account,disabled FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account,disabled FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3120,7 +3120,7 @@ sub enable_user_account($$$)
 	make_error("No username specified.") if (!$user_to_enable);
 	make_error("Insufficient privledges.") if ($type ne 'admin');
 
-	my $sth=$dbh->prepare("SELECT account FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_enable) or make_error(S_SQLFAIL);	
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3129,7 +3129,7 @@ sub enable_user_account($$$)
 	
 	$sth->finish();
 	
-	my $disable=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET disabled='0' WHERE username=?;") or make_error(S_SQLFAIL);
+	my $disable=$dbh->prepare("UPDATE `".SQL_ACCOUNT_TABLE."` SET disabled='0' WHERE username=?;") or make_error(S_SQLFAIL);
 	$disable->execute($user_to_enable) or make_error(S_SQLFAIL);
 	$disable->finish();
 	
@@ -3144,7 +3144,7 @@ sub make_edit_user_account_window($$)
 	
 	make_error("Insufficient privledges.") if ($type ne 'admin' && $user_to_edit ne $username);
 	
-	my $sth=$dbh->prepare("SELECT account, reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT account, reign FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
 	
 	my $row = $sth->fetchrow_hashref();
@@ -3185,7 +3185,7 @@ sub edit_user_account($$$$$$@)
 	make_error("Please limit the password to thirty characters maximum.") if ($newpassword && length $newpassword > 30);
 	make_error("Passwords should be at least eight characters!") if ($newpassword && length $newpassword < 8);
 
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT * FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_edit) or make_error(S_SQLFAIL);
 
 	my $row = $sth->fetchrow_hashref();
@@ -3205,14 +3205,14 @@ sub edit_user_account($$$$$$@)
 	
 	if ($newpassword)
 	{
-		my $pass_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET password=? WHERE username=?;") or make_error(S_SQLFAIL);
+		my $pass_change=$dbh->prepare("UPDATE `".SQL_ACCOUNT_TABLE."` SET password=? WHERE username=?;") or make_error(S_SQLFAIL);
 		$pass_change->execute(hide_critical_data($newpassword,SECRET),$user_to_edit) or make_error(S_SQLFAIL);
 		$pass_change->finish();
 	}
 
 	if ($newclass)
 	{
-		my $class_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET account=? WHERE username=?;") or make_error(S_SQLFAIL);
+		my $class_change=$dbh->prepare("UPDATE `".SQL_ACCOUNT_TABLE."` SET account=? WHERE username=?;") or make_error(S_SQLFAIL);
 		$class_change->execute($newclass,$user_to_edit) or make_error(S_SQLFAIL);
 		$class_change->finish();
 	}
@@ -3220,7 +3220,7 @@ sub edit_user_account($$$$$$@)
 	if ($$row{account} eq 'mod') # If user was a moderator (whether user still is or is being promoted), then update reign string 
 	{
 		my $reignstring = join (" ", @reign);
-		my $reign_change=$dbh->prepare("UPDATE ".SQL_ACCOUNT_TABLE." SET reign=? WHERE username=?;") or make_error(S_SQLFAIL);
+		my $reign_change=$dbh->prepare("UPDATE `".SQL_ACCOUNT_TABLE."` SET reign=? WHERE username=?;") or make_error(S_SQLFAIL);
 		$reign_change->execute($reignstring,$user_to_edit) or make_error(S_SQLFAIL);
 		$reign_change->finish();
 	}
@@ -3249,7 +3249,7 @@ sub create_user_account($$$$$@)
 	make_error("Passwords should be at least eight characters!") if (length $password < 8);
 	make_error("No boards specified for local moderator.") if (!@reign && $account_type eq 'mod');
 	
-	my $sth=$dbh->prepare("SELECT * FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("SELECT * FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 	$sth->execute($user_to_create) or make_error(S_SQLFAIL);
 	my $row = $sth->fetchrow_hashref();
 	
@@ -3274,7 +3274,7 @@ sub create_user_account($$$$$@)
 sub insert_user_account_entry($$$$)
 {
 	my ($username,$encrypted_password,$reignstring,$type) = @_;
-	my $sth=$dbh->prepare("INSERT INTO ".SQL_ACCOUNT_TABLE." VALUES (?,?,?,?,?);") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("INSERT INTO `".SQL_ACCOUNT_TABLE."` VALUES (?,?,?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute($username,$type,$encrypted_password,$reignstring,0) or make_error(S_SQLFAIL);
 	$sth->finish();
 }
@@ -3283,7 +3283,7 @@ sub add_log_entry($$$$$$$) # add in new log entry by column (see init)
 {
 	trim_staff_log();
 	
-	my $sth=$dbh->prepare("INSERT INTO ".SQL_STAFFLOG_TABLE." VALUES (null,?,?,?,?,?,?,?);") or make_error(S_SQLFAIL);
+	my $sth=$dbh->prepare("INSERT INTO `".SQL_STAFFLOG_TABLE."` VALUES (null,?,?,?,?,?,?,?);") or make_error(S_SQLFAIL);
 	$sth->execute(@_) or make_error(S_SQLFAIL);
 	
 	$sth->finish();
@@ -3405,7 +3405,7 @@ sub report_post($$@)
 		}
 		
 		# Post check
-		$sth=$dbh->prepare('SELECT ip FROM '.$board->option('SQL_TABLE').' WHERE num=?;');
+		$sth=$dbh->prepare('SELECT ip FROM `'.$board->option('SQL_TABLE').'` WHERE num=?;');
 		$sth->execute($post);
 		$board_sql_row = $sth->fetchrow_hashref();
 		if (!$board_sql_row)
@@ -3419,7 +3419,7 @@ sub report_post($$@)
 		$sth->finish();
 		
 		# Table row check
-		$sth=$dbh->prepare('SELECT * FROM '.SQL_REPORT_TABLE.' WHERE postnum=? AND board=?;');
+		$sth=$dbh->prepare('SELECT * FROM `'.SQL_REPORT_TABLE.'` WHERE postnum=? AND board=?;');
 		$sth->execute($post,$board->path());
 		my $row=$sth->fetchrow_hashref();
 		
@@ -3433,7 +3433,7 @@ sub report_post($$@)
 		}
 		
 		# File report
-		$sth=$dbh->prepare('INSERT INTO '.SQL_REPORT_TABLE.' VALUES (NULL,?,?,?,?,?,?,?,0);');
+		$sth=$dbh->prepare('INSERT INTO `'.SQL_REPORT_TABLE.'` VALUES (NULL,?,?,?,?,?,?,?,0);');
 		$sth->execute($board->path(),$numip,$offender_ip,$post,$comment,time(),make_date(time()+TIME_OFFSET,DATE_STYLE));
 		$sth->finish();
 	}
@@ -3456,7 +3456,7 @@ sub mark_resolved($$$%)
 	
 	if ($type eq 'mod')
 	{
-		my $reigncheck=$dbh->prepare("SELECT reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+		my $reigncheck=$dbh->prepare("SELECT reign FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 		$reigncheck->execute($username) or make_error(S_SQLFAIL);
 		$reign=($reigncheck->fetchrow_array())[0];
 	
@@ -3494,7 +3494,7 @@ sub mark_resolved($$$%)
 		foreach my $post (@{$posts{$board_name}})
 		{
 			# check presence of row
-			my $sth=$dbh->prepare('SELECT * FROM '.SQL_REPORT_TABLE.' WHERE postnum=? AND board=?;') or make_error(S_SQLFAIL);
+			my $sth=$dbh->prepare('SELECT * FROM `'.SQL_REPORT_TABLE.'` WHERE postnum=? AND board=?;') or make_error(S_SQLFAIL);
 			$sth->execute($post,$board_name) or make_error(S_SQLFAIL);
 			
 			if (!(($sth->fetchrow_array())[0]))
@@ -3506,7 +3506,7 @@ sub mark_resolved($$$%)
 			}
 			$sth->finish();
 			
-			$sth=$dbh->prepare('UPDATE '.SQL_REPORT_TABLE.' SET resolved=1 WHERE postnum=? AND board=?;') or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare('UPDATE `'.SQL_REPORT_TABLE.'` SET resolved=1 WHERE postnum=? AND board=?;') or make_error(S_SQLFAIL);
 			$sth->execute($post,$board_name) or make_error(S_SQLFAIL);
 			$sth->finish();
 			
@@ -3536,7 +3536,7 @@ sub make_report_page($$$$$)
 	# Restrict view if local moderator
 	if ($type eq 'mod')
 	{
-		$sth=$dbh->prepare("SELECT reign FROM ".SQL_ACCOUNT_TABLE." WHERE username=?;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT reign FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
 		$sth->execute($username) or make_error(S_SQLFAIL);
 		@boards = split (/ /, ($sth->fetchrow_array)[0]);
 		$sth->finish();
@@ -3556,7 +3556,7 @@ sub make_report_page($$$$$)
 	
 	$resolved_only .= (@boards) ? 'AND resolved=0' : 'WHERE resolved=0';
 	
-	my $count_get = $dbh->prepare('SELECT COUNT(*) FROM '.SQL_REPORT_TABLE." $where_string $resolved_only;");
+	my $count_get = $dbh->prepare('SELECT COUNT(*) FROM `'.SQL_REPORT_TABLE."` $where_string $resolved_only;");
 	$count_get->execute(@boards) or make_error(S_SQLFAIL);
 	my $count = ($count_get->fetchrow_array())[0];
 
@@ -3566,7 +3566,7 @@ sub make_report_page($$$$$)
 	($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	$count_get->finish();
 	
-	$sth=$dbh->prepare('SELECT board AS board_name,reporter,offender,postnum,comment,date FROM '.SQL_REPORT_TABLE." $where_string $resolved_only ORDER BY $sortby_string LIMIT $perpage OFFSET $offset;");
+	$sth=$dbh->prepare('SELECT board AS board_name,reporter,offender,postnum,comment,date FROM `'.SQL_REPORT_TABLE."` $where_string $resolved_only ORDER BY $sortby_string LIMIT $perpage OFFSET $offset;");
 	$sth->execute(@boards);
 	
 	while (my $row = $sth->fetchrow_hashref())
@@ -3602,7 +3602,7 @@ sub make_resolved_report_page($$$$$)
 		$sortby_string .= 'date DESC';
 	}
 	
-	my $count_get = $dbh->prepare('SELECT COUNT(*) FROM '.SQL_REPORT_TABLE.' WHERE resolved<>0;');
+	my $count_get = $dbh->prepare('SELECT COUNT(*) FROM `'.SQL_REPORT_TABLE.'` WHERE resolved<>0;');
 	$count_get->execute(@boards) or make_error(S_SQLFAIL);
 	my $count = ($count_get->fetchrow_array())[0];
 
@@ -3612,7 +3612,7 @@ sub make_resolved_report_page($$$$$)
 	($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
 	$count_get->finish();
 	
-	$sth=$dbh->prepare('SELECT '.SQL_REPORT_TABLE.'.board AS board_name,'.SQL_REPORT_TABLE.'.reporter,'.SQL_REPORT_TABLE.'.offender,'.SQL_REPORT_TABLE.'.postnum,'.SQL_REPORT_TABLE.'.comment,'.SQL_REPORT_TABLE.'.date,'.SQL_STAFFLOG_TABLE.'.username FROM '.SQL_REPORT_TABLE." LEFT OUTER JOIN ".SQL_STAFFLOG_TABLE." ON CONCAT(".SQL_REPORT_TABLE.".board,',',".SQL_REPORT_TABLE.".postnum)=".SQL_STAFFLOG_TABLE.".info WHERE ".SQL_REPORT_TABLE.".resolved<>0 ORDER BY $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare('SELECT `'.SQL_REPORT_TABLE.'`.board AS board_name,`'.SQL_REPORT_TABLE.'`.reporter,`'.SQL_REPORT_TABLE.'`.offender,`'.SQL_REPORT_TABLE.'`.postnum,`'.SQL_REPORT_TABLE.'`.comment,`'.SQL_REPORT_TABLE.'`.date,`'.SQL_STAFFLOG_TABLE.'`.username FROM `'.SQL_REPORT_TABLE."` LEFT OUTER JOIN `".SQL_STAFFLOG_TABLE."` ON CONCAT(`".SQL_REPORT_TABLE."`.board,',',`".SQL_REPORT_TABLE."`.postnum)=`".SQL_STAFFLOG_TABLE."`.info WHERE `".SQL_REPORT_TABLE."`.resolved<>0 ORDER BY $sortby_string LIMIT $perpage OFFSET $offset;") or make_error(S_SQLFAIL);
 	$sth->execute(@boards) or make_error(S_SQLFAIL);
 	
 	while (my $row = $sth->fetchrow_hashref())
@@ -3632,7 +3632,7 @@ sub make_resolved_report_page($$$$$)
 sub local_reported_posts() # return array of hash-reference rows of the unresolved posts for current board
 {			# It *might* be worthwhile adding on to the SQL to display abbreviated post information. (Naturally the post will be linked to from the reports page.)
 	
-	my $sth=$dbh->prepare('SELECT reporter,offender,postnum,comment,date,resolved FROM '.SQL_REPORT_TABLE.' WHERE board=? AND resolved=0;');
+	my $sth=$dbh->prepare('SELECT reporter,offender,postnum,comment,date,resolved FROM `'.SQL_REPORT_TABLE.'` WHERE board=? AND resolved=0;');
 	$sth->execute($board->path());
 	
 	my (@reported_posts);
@@ -3732,8 +3732,8 @@ sub init_database()
 {
 	my ($sth);
 
-	$sth=$dbh->do("DROP TABLE ".$board->option('SQL_TABLE').";") if(table_exists($board->option('SQL_TABLE')));
-	$sth=$dbh->prepare("CREATE TABLE ".$board->option('SQL_TABLE')." (".
+	$sth=$dbh->do("DROP TABLE `".$board->option('SQL_TABLE')."`;") if(table_exists($board->option('SQL_TABLE')));
+	$sth=$dbh->prepare("CREATE TABLE `".$board->option('SQL_TABLE')."` (".
 
 	"num ".get_sql_autoincrement().",".	# Post number, auto-increments
 	"parent INTEGER,".			# Parent post for replies in threads. For original posts, must be set to 0 (and not null)
@@ -3773,8 +3773,8 @@ sub init_admin_database()
 {
 	my ($sth);
 
-	$sth=$dbh->do("DROP TABLE ".SQL_ADMIN_TABLE.";") if(table_exists(SQL_ADMIN_TABLE));
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_ADMIN_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_ADMIN_TABLE."`;") if(table_exists(SQL_ADMIN_TABLE));
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_ADMIN_TABLE."` (".
 
 	"num ".get_sql_autoincrement().",".	# Entry number, auto-increments
 	"type TEXT,".				# Type of entry (ipban, wordban, etc)
@@ -3793,8 +3793,8 @@ sub init_proxy_database()
 {
 	my ($sth);
 
-	$sth=$dbh->do("DROP TABLE ".SQL_PROXY_TABLE.";") if(table_exists(SQL_PROXY_TABLE));
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_PROXY_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_PROXY_TABLE."`;") if(table_exists(SQL_PROXY_TABLE));
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_PROXY_TABLE."` (".
 
 	"num ".get_sql_autoincrement().",".	# Entry number, auto-increments
 	"type TEXT,".				# Type of entry (black, white, etc)
@@ -3811,8 +3811,8 @@ sub init_account_database() # Staff accounts.
 {
 	my ($sth);
 	
-	$sth=$dbh->do("DROP TABLE ".SQL_ACCOUNT_TABLE.";") if(table_exists(SQL_ACCOUNT_TABLE));
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_ACCOUNT_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_ACCOUNT_TABLE."`;") if(table_exists(SQL_ACCOUNT_TABLE));
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_ACCOUNT_TABLE."` (".
 	"username VARCHAR(25) PRIMARY KEY NOT NULL UNIQUE,".	# Name of user--must be unique
 	"account TEXT NOT NULL,".				# Account type/class: mod, globmod, admin
 	"password TEXT NOT NULL,".				# Encrypted password
@@ -3828,8 +3828,8 @@ sub init_activity_database() # Staff activity log
 {
 	my ($sth);
 	
-	$sth=$dbh->do("DROP TABLE ".SQL_STAFFLOG_TABLE.";") if(table_exists(SQL_STAFFLOG_TABLE));
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_STAFFLOG_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_STAFFLOG_TABLE."`;") if(table_exists(SQL_STAFFLOG_TABLE));
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_STAFFLOG_TABLE."` (".
 	"num ".get_sql_autoincrement().",".	# ID
 	"username VARCHAR(25) NOT NULL,".	# Name of moderator involved
 	"action TEXT,".				# Action performed: post_delete, admin_post, admin_edit, ip_ban, ban_edit, ban_remove
@@ -3848,8 +3848,8 @@ sub init_common_site_database() # Index of all the boards sharing the same image
 {
 	my ($sth);
 	
-	$sth=$dbh->do("DROP TABLE ".SQL_COMMON_SITE_TABLE.";") if table_exists(SQL_COMMON_SITE_TABLE);
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_COMMON_SITE_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_COMMON_SITE_TABLE."`;") if table_exists(SQL_COMMON_SITE_TABLE);
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_COMMON_SITE_TABLE."` (".
 	"board VARCHAR(25) PRIMARY KEY NOT NULL UNIQUE,".	# Name of comment table
 	"type TEXT".						# Corresponding board type? (Later use)
 	");") or make_error(S_SQLFAIL);				# And that's it. Hopefully this is a more efficient solution than handling it all in code or a text file.
@@ -3862,8 +3862,8 @@ sub init_report_database()
 {
 	my ($sth);
 	
-	$sth=$dbh->do("DROP TABLE ".SQL_REPORT_TABLE.";") if table_exists(SQL_REPORT_TABLE);
-	$sth=$dbh->prepare("CREATE TABLE ".SQL_REPORT_TABLE." (".
+	$sth=$dbh->do("DROP TABLE `".SQL_REPORT_TABLE."`;") if table_exists(SQL_REPORT_TABLE);
+	$sth=$dbh->prepare("CREATE TABLE `".SQL_REPORT_TABLE."` (".
 	"num ".get_sql_autoincrement().",".	# Report number, auto-increments
 	"board VARCHAR(25) NOT NULL,".		# Board name
 	"reporter TEXT NOT NULL,".		# Reporter's IP address (decimal encoded)
@@ -3883,7 +3883,7 @@ sub repair_database()
 {
 	my ($sth,$row,@threads,$thread);
 
-	$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 
 	while($row=$sth->fetchrow_hashref()) { push(@threads,$row); }
@@ -3893,7 +3893,7 @@ sub repair_database()
 		# fix lasthit
 		my ($upd);
 
-		$upd=$dbh->prepare("UPDATE ".$board->option('SQL_TABLE')." SET lasthit=? WHERE parent=?;") or make_error(S_SQLFAIL);
+		$upd=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET lasthit=? WHERE parent=?;") or make_error(S_SQLFAIL);
 		$upd->execute($$row{lasthit},$$row{num}) or make_error(S_SQLFAIL." ".$dbh->errstr());
 		$upd->finish();
 	}
@@ -3920,7 +3920,7 @@ sub trim_database()
 	{
 		my $mintime=time()-($board->option('MAX_AGE'))*3600;
 
-		$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0 AND timestamp<=$mintime AND stickied<>1;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=0 AND timestamp<=$mintime AND stickied<>1;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 
 		while($row=$sth->fetchrow_hashref())
@@ -3937,7 +3937,7 @@ sub trim_database()
 
 	while($threads>$max_threads or $posts>$max_posts or $size>$max_size)
 	{
-		$sth=$dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE parent=0 AND stickied<>1 ORDER BY $order LIMIT 1;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=0 AND stickied<>1 ORDER BY $order LIMIT 1;") or make_error(S_SQLFAIL);
 		$sth->execute() or make_error(S_SQLFAIL);
 
 		if($row=$sth->fetchrow_hashref())
@@ -3961,13 +3961,13 @@ sub trim_reported_posts(;$)
 	my ($date) = @_;
 	if ($date)
 	{
-		my $sth=$dbh->prepare("DELETE FROM ".SQL_REPORT_TABLE." WHERE timestamp<=?;") or make_error(S_SQLFAIL);
+		my $sth=$dbh->prepare("DELETE FROM `".SQL_REPORT_TABLE."` WHERE timestamp<=?;") or make_error(S_SQLFAIL);
 		$sth->execute(time()-$date) or make_error(S_SQLFAIL);
 		$sth->finish();
 	}
 	elsif (REPORT_RETENTION)
 	{
-		my $sth=$dbh->prepare("DELETE FROM ".SQL_REPORT_TABLE." WHERE timestamp<=?;") or make_error(S_SQLFAIL);
+		my $sth=$dbh->prepare("DELETE FROM `".SQL_REPORT_TABLE."` WHERE timestamp<=?;") or make_error(S_SQLFAIL);
 		$sth->execute(time()-(REPORT_RETENTION)) or make_error(S_SQLFAIL);
 		$sth->finish();
 	}
@@ -3978,13 +3978,13 @@ sub trim_staff_log(;$)
 	my $date = @_;
 	if ($date)
 	{
-		my $sth=$dbh->prepare("DELETE FROM ".SQL_STAFFLOG_TABLE." WHERE timestamp<=?;") or make_error(S_SQLFAIL);
+		my $sth=$dbh->prepare("DELETE FROM `".SQL_STAFFLOG_TABLE."` WHERE timestamp<=?;") or make_error(S_SQLFAIL);
 		$sth->execute(time()-$date) or make_error(S_SQLFAIL);
 		$sth->finish();
 	}
 	elsif (STAFF_LOG_RETENTION)
 	{
-		my $sth=$dbh->prepare("DELETE FROM ".SQL_STAFFLOG_TABLE." WHERE timestamp<=?;") or make_error(S_SQLFAIL);
+		my $sth=$dbh->prepare("DELETE FROM `".SQL_STAFFLOG_TABLE."` WHERE timestamp<=?;") or make_error(S_SQLFAIL);
 		$sth->execute(time()-(STAFF_LOG_RETENTION)) or make_error(S_SQLFAIL);
 		$sth->finish();
 	}
@@ -4048,7 +4048,7 @@ sub table_exists($)
 	my ($table)=@_;
 	my ($sth);
 
-	return 0 unless($sth=$dbh->prepare("SELECT * FROM ".$table." LIMIT 1;"));
+	return 0 unless($sth=$dbh->prepare("SELECT * FROM `".$table."` LIMIT 1;"));
 	return 0 unless($sth->execute());
 	$sth->finish();
 	return 1;
@@ -4058,7 +4058,7 @@ sub count_threads()
 {
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".$board->option('SQL_TABLE')."` WHERE parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -4072,7 +4072,7 @@ sub count_posts(;$)
 	my ($sth,$where);
 
 	$where="WHERE parent=$parent or num=$parent" if($parent);
-	$sth=$dbh->prepare("SELECT count(*),sum(size) FROM ".$board->option('SQL_TABLE')." $where;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*),sum(size) FROM `".$board->option('SQL_TABLE')."` $where;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	my @return = ($sth->fetchrow_array());
 	$sth->finish();
@@ -4085,7 +4085,7 @@ sub thread_exists($)
 	my ($thread)=@_;
 	my ($sth);
 
-	$sth=$dbh->prepare("SELECT count(*) FROM ".$board->option('SQL_TABLE')." WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT count(*) FROM `".$board->option('SQL_TABLE')."` WHERE num=? AND parent=0;") or make_error(S_SQLFAIL);
 	$sth->execute($thread) or make_error(S_SQLFAIL);
 	my $return = ($sth->fetchrow_array())[0];
 	$sth->finish();
@@ -4134,7 +4134,7 @@ sub get_boards() # Get array of referenced hashes of all boards
 	my @boards; # Board list
 	my $board_is_present = 0; # Is the current board present?
 	
-	my $sth = $dbh->prepare("SELECT board AS 'board_entry' FROM ".SQL_COMMON_SITE_TABLE." ORDER BY board;") or make_error(S_SQLFAIL);
+	my $sth = $dbh->prepare("SELECT board AS 'board_entry' FROM `".SQL_COMMON_SITE_TABLE."` ORDER BY board;") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	
 	while (my $row=$sth->fetchrow_hashref())
@@ -4157,14 +4157,14 @@ sub get_boards() # Get array of referenced hashes of all boards
 
 sub add_board_to_index()
 {
-	my $fix = $dbh->prepare("INSERT INTO ".SQL_COMMON_SITE_TABLE." VALUES(?,?);") or make_error(S_SQLFAIL);
+	my $fix = $dbh->prepare("INSERT INTO `".SQL_COMMON_SITE_TABLE."` VALUES(?,?);") or make_error(S_SQLFAIL);
 	$fix->execute($board->path(),"") or return 0;
 	$fix->finish();
 }
 
 sub remove_board_from_index()
 {
-	my $fix = $dbh->prepare("DELETE FROM ".SQL_COMMON_SITE_TABLE." WHERE board = ?;") or make_error(S_SQLFAIL);
+	my $fix = $dbh->prepare("DELETE FROM `".SQL_COMMON_SITE_TABLE."` WHERE board = ?;") or make_error(S_SQLFAIL);
 	$fix->execute($board->path()) or return 0;
 	$fix->finish();
 }
@@ -4212,7 +4212,7 @@ sub make_painter($$$$$$$$$)
 	
 	if ($oek_editing)
 	{
-		my $sth = $dbh->prepare("SELECT password FROM ".$board->option('SQL_TABLE')." WHERE num=?;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT password FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
 		$sth->execute($num) or make_error(S_SQLFAIL);
 		my $row=get_decoded_hashref($sth);
 		make_error(S_BADEDITPASS) if ($password ne $$row{password});
@@ -4286,7 +4286,7 @@ sub make_oekaki_finish($$$$$$$)
 	}
 	else
 	{	
-		my $sth = $dbh->prepare("SELECT * FROM ".$board->option('SQL_TABLE')." WHERE num = ?;");
+		my $sth = $dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num = ?;");
 		$sth->execute($num);
 		my $row = get_decoded_hashref($sth);
 		
@@ -4405,7 +4405,7 @@ while ( $query = new CGI::Fast )
 	my $task=($query->param("task") or $query->param("action"));
 	
 	# Check for and remove old bans
-	my $oldbans=$dbh->prepare("SELECT ival1, total FROM ".SQL_ADMIN_TABLE." WHERE expiration <= ".time()." AND expiration <> 0 AND expiration IS NOT NULL;");
+	my $oldbans=$dbh->prepare("SELECT ival1, total FROM `".SQL_ADMIN_TABLE."` WHERE expiration <= ".time()." AND expiration <> 0 AND expiration IS NOT NULL;");
 	$oldbans->execute() or make_error(S_SQLFAIL);
 	my @unbanned_ips;
 	while (my $banrow = get_decoded_hashref($oldbans))
@@ -4422,7 +4422,7 @@ while ( $query = new CGI::Fast )
 	
 	foreach (@unbanned_ips)
 	{	
-		my $removeban = $dbh->prepare("DELETE FROM ".SQL_ADMIN_TABLE." WHERE ival1=?") or make_error(S_SQLFAIL);
+		my $removeban = $dbh->prepare("DELETE FROM `".SQL_ADMIN_TABLE."` WHERE ival1=?") or make_error(S_SQLFAIL);
 		$removeban->execute($_) or make_error(S_SQLFAIL);
 		$removeban->finish();
 	}
