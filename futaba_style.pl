@@ -71,7 +71,7 @@ use constant MINI_HEAD_INCLUDE => q{
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-<title><if $title><var $title> - </if><var $board-\>path()></title>
+<title><var $board-\>path()> - <var $$board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
@@ -1006,7 +1006,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 <hr />
 
-<div class="dellist"><h3>Nuke Spam by IP</h3></div>
+<div class="dellist"><h3>Nuke Spam (in This Board) by IP</h3></div>
 
 <div class="postarea">
 <form action="<var $self>" method="post">
@@ -1030,7 +1030,7 @@ use constant REPORT_PANEL_TEMPLATE => compile_template (MANAGER_HEAD_INCLUDE.q{
 <form action="<var $self>" method="post" id="reportedposts">
 <input type="hidden" name="task" value="resolve" />
 <input type="hidden" name="board" value="<var $board-\>path()>" />
-<table align="center" style="white-space: nowrap"><tbody>
+<table align="center"><tbody>
 <tr class="managehead"><th>Post</th><th>Board</th><th>Date</th><th>Comment</th><th>Posting IP</th><th>Reporting IP</th><if $type eq 'admin' && $resolved_posts_only><th>Involved Moderator</th></if></tr>
 <loop $reports>
 	<tr class="row<var $rowtype>">
@@ -1050,7 +1050,7 @@ use constant REPORT_PANEL_TEMPLATE => compile_template (MANAGER_HEAD_INCLUDE.q{
 		</table>
 	</td>
 
-	<td><var $board_name></td>
+	<td><strong><var $board_name></strong></td>
 	<td><var $date></td>
 	<td><var $comment></td>
 	<td><var dec_to_dot($offender)> [<a href="<var $self>?task=banpopup&amp;board=<var $board-\>path()>&amp;ip=<var dec_to_dot($offender)>" onclick="popUpPost('<var $self>?task=banpopup&amp;board=<var $board-\>path()>&amp;ip=<var dec_to_dot($offender)>');return false"><const S_MPBAN></a>]</td>

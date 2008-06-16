@@ -68,6 +68,7 @@ sub make_error($;$$)
 
 	# delete temp files
 
+	$handling_request=0;
 	last if $count > $maximum_allowed_loops;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
@@ -78,12 +79,12 @@ sub make_error($;$$)
 
 sub sig_handler { 
 	$exit_requested = 1;
-	exit(0) if !$handling_request;
+	exit() if !$handling_request;
 }
 
-$SIG{USR1} = \&sig_handler;
-$SIG{TERM} = \&sig_handler;
-$SIG{PIPE} = 'IGNORE';
+#$SIG{USR1} = \&sig_handler;
+#$SIG{TERM} = \&sig_handler;
+#$SIG{PIPE} = 'IGNORE';
 
 #
 # Database
@@ -550,6 +551,8 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 		{
 			# add staff log entry
 			add_log_entry($username,'admin_post',$board->path().','.$num,$date,$numip,0,$time) if($admin_post_mode);
+			
+			init_report_database() if ($num == 1); # If this is the first post on a board recently cleared of posts, the post count will reset; so should our reports, then.
 			
 			build_thread_cache($num);
 			$parent = $num; # For use with "noko" below
@@ -1137,6 +1140,7 @@ sub host_is_banned($) # subroutine for handling bans
 	# delete temp files
 
 	last if $count > $maximum_allowed_loops;
+	$handling_request = 0;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
 }
 
@@ -1681,7 +1685,7 @@ sub delete_stuff($$$$$$@)
 			add_log_entry($username,'admin_delete',$board->path().','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0,time());
 			if ($caller ne 'internal') # If not called by mark_resolved() itself...
 			{
-				my $reportcheck = $dbh->prepare("SELECT * FROM ".SQL_REPORT_TABLE." WHERE postnum=? LIMIT 1");
+				my $reportcheck = $dbh->prepare("SELECT * FROM ".SQL_REPORT_TABLE." WHERE postnum=? AND resolved=0 LIMIT 1");
 				$reportcheck->execute($post);
 				my $current_board_name = $board->path();
 				mark_resolved($admin,'','internal',($current_board_name=>[$post])) if (($reportcheck->fetchrow_array())[0]);
@@ -2941,12 +2945,11 @@ sub remove_htaccess_entry($)
 	my $ip = $_[0];
 	$ip =~ s/\./\\\\\./g;
 	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
-	my $file_contents;
-	while (<HTACCESSREAD>)
-	{	
-		$file_contents .= $_;
+	my $file_contents = do { local $/; <HTACCESSREAD> };
+	if ($file_contents =~ m/\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\) \/wakaba.pl\?task\=banreport\&board\=\w*?\n?/)
+	{
+		$file_contents =~ s/(.*)\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\) \/wakaba.pl\?task\=banreport\&board\=\w*?\n?(.*)/$1$2/s;
 	}
-	$file_contents =~ s/(.*)\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\).*?\?task\=banreport\n(.*)/$1$2/s;
 	close HTACCESSREAD;
 	open (HTACCESSWRITE, ">".HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
 	print HTACCESSWRITE $file_contents;
@@ -3992,6 +3995,7 @@ sub first_time_setup_page()
 	make_http_header();
 	print encode_string(FIRST_TIME_SETUP->(stylesheets=>get_stylesheets(),board=>$board));
 	last if $count > $maximum_allowed_loops;
+	$handling_request=0;
 	next;
 }
 
@@ -4157,6 +4161,7 @@ sub get_boards() # Get array of referenced hashes of all boards
 sub abort_user_action()
 {
 	last if $count > $maximum_allowed_loops;
+	$handling_request=0;
 	next;
 }
 
@@ -4360,10 +4365,10 @@ while ( $query = new CGI::Fast )
 	init_report_database() if (!table_exists(SQL_REPORT_TABLE));
 	
 	# check for staff accounts
-	first_time_setup_page() if (!table_exists(SQL_ACCOUNT_TABLE) && $query->param("task") ne 'entersetup' && !$query->param("admin"));
+	first_time_setup_page() if (!table_exists(SQL_ACCOUNT_TABLE) && $query->param("task") ne 'entersetup' && $query->param("task") ne "setup");
 	
 	# check for staff accounts
-	init_activity_database() if (!table_exists(SQL_STAFFLOG_TABLE) && $query->param("task") ne 'entersetup' && !$query->param("admin"));	
+	init_activity_database() if (!table_exists(SQL_STAFFLOG_TABLE) && table_exists(SQL_ACCOUNT_TABLE));	
 	
 	# Check for .htaccess
 	
@@ -4374,7 +4379,7 @@ while ( $query = new CGI::Fast )
 		close HTACCESSMAKE;
 	}
 	
-	if(!table_exists($board->option('SQL_TABLE'))) # check for comments table
+	if(!table_exists($board->option('SQL_TABLE')) && table_exists(SQL_ACCOUNT_TABLE)) # check for comments table
 	{
 		init_database();
 		build_cache();
