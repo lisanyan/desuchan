@@ -3710,7 +3710,7 @@ sub expand_filename($;$)
 
 	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
 	# If the optional argument is set to true value, force vanilla HTTP in place of SSL in case USE_SECURE_ADMIN is enabled
-	$self_path =~ s/^https\:/http\:/ if ($force_http);
+	$self_path = 'http://'.$ENV{SERVER_NAME}.$self_path if ($force_http);
 	my $board_path=$board->path().'/';
 	return $self_path.$board_path.$filename;
 }
