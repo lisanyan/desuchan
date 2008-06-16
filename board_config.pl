@@ -112,7 +112,6 @@ $config{ARCHIVE_DIR} = 'arch/';			# Root of archive directories (all need to be 
 $config{REDIR_DIR} = 'redir/';			# Redir directory, used for redirecting clients when load balancing
 $config{HTML_SELF} = 'wakaba.xhtml';		# Name of main html file
 $config{JS_FILE} = 'wakaba.js';			# Location of the js file
-$config{PAGE_EXT} = '.html';				# Extension used for board pages after first
 $config{CSS_DIR} = "css/";
 												# Hints: * Set all boards to use the same file for easy updating.
 												#        * Set up two files, one being the official list from
