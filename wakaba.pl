@@ -2895,9 +2895,11 @@ sub do_nuke_database($$)
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 	# END ADDED
 
-	init_database();
+	#init_database();
 	#init_admin_database();
 	#init_proxy_database();
+	
+	remove_board_from_index();
 
 	# remove images, thumbnails and threads
 	unlink glob $board->path().'/'.board->option('IMG_DIR').'*';
@@ -3763,6 +3765,8 @@ sub init_database()
 	");") or make_error(S_SQLFAIL);
 	$sth->execute() or make_error(S_SQLFAIL);
 	$sth->finish();
+	
+	add_board_to_index();
 }
 
 sub init_admin_database()
@@ -4143,15 +4147,26 @@ sub get_boards() # Get array of referenced hashes of all boards
 	
 	unless ($board_is_present)
 	{
-		my $fix = $dbh->prepare("INSERT INTO ".SQL_COMMON_SITE_TABLE." VALUES(?,?);") or make_error(S_SQLFAIL);
-		$fix->execute($board->path(),"") or make_error(S_SQLFAIL);
-		$fix->finish();
-		
+		add_board_to_index();
 		my $row = {board_entry=>$board->path()};
 		push @boards, $row;
 	}
 	
 	@boards;
+}
+
+sub add_board_to_index()
+{
+	my $fix = $dbh->prepare("INSERT INTO ".SQL_COMMON_SITE_TABLE." VALUES(?,?);") or make_error(S_SQLFAIL);
+	$fix->execute($board->path(),"") or return 0;
+	$fix->finish();
+}
+
+sub remove_board_from_index()
+{
+	my $fix = $dbh->prepare("DELETE FROM ".SQL_COMMON_SITE_TABLE." WHERE board = ?;") or make_error(S_SQLFAIL);
+	$fix->execute($board->path()) or return 0;
+	$fix->finish();
 }
 
 #
