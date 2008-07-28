@@ -260,7 +260,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 		</td></tr>
 	</if>
 
-	<tr><td class="postblock"><const S_DELPASS></td><td><input type="password" name="password" size="8" autocomplete="off"/> <const S_DELEXPL></td></tr>
+	<tr><td class="postblock"><const S_DELPASS></td><td><input type="password" name="password" size="8" /> <const S_DELEXPL></td></tr>
 	<tr><td colspan="2">
 	<div class="rules"><var encode_string((compile_template(include($board-\>path().'/'."include/rules.html")))-\>(board=\>$board))></div></td></tr>
 	</tbody></table></form></div>
@@ -323,7 +323,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>',false); return false">Delete</a>]
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>&amp;board=<var $board-\>path()>" target="_blank" onclick="passfield('<var $num>',false); return false">Delete</a>]
 				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
@@ -370,7 +370,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
-				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>', false); return false">Delete</a>]
+				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>&amp;board=<var $board-\>path>" target="_blank" onclick="passfield('<var $num>', false); return false">Delete</a>]
 				<span id="delpostcontent<var $num>" style="display:inline"></span>
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]
@@ -412,7 +412,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 <table class="userdelete"><tbody><tr><td>
 <input type="hidden" name="board" value="<var $board-\>path>" />
 <const S_REPDEL>[<label><input type="checkbox" name="fileonly" value="on" /><const S_DELPICONLY></label>] 
-<const S_DELKEY><input type="password" name="password" size="8" autocomplete="off" /> 
+<const S_DELKEY><input type="password" name="password" size="8" /> 
 <input value="<const S_DELETE>" name="task" type="submit" /></td></tr>
 <tr><td>Report Post(s) to Staff <input value="Report" name="task" type="submit" /></td></tr>
 </tbody></table>
@@ -450,15 +450,22 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 use constant PASSWORD => compile_template (MINI_HEAD_INCLUDE. q{
 	<h1 style="text-align:center;font-size:1em">Now Editing Post No.<var $num></h1>
-	<form action="<var $self>?board=<var $board-\>path>" method="post" id="delform">	
-	<input type="hidden" name="task" value="editpostwindow" />
-	<input type="hidden" name="board" value="<var $board-\>path()>" />
-	<input type="hidden" name="num" value="<var $num>" />
-	<if !$admin_post><p style="text-align:center"><const S_PROMPTPASSWORD><input type="password" name="password" size="8" autocomplete="off" /></if>
-	<if $admin_post><p style="text-align:center"><const S_PROMPTPASSWORDADMIN><input type="password" name="admin" size="8" autocomplete="off" /></if>
-	<input value="Edit" type="submit" /></p>
-	<if !$admin_post><script type="text/javascript">set_delpass("delform")</script></if>
-	</form>
+	<if !$admin_post>
+		<form action="<var $self>?board=<var $board-\>path>" method="post" id="delform">	
+		<input type="hidden" name="task" value="editpostwindow" />
+		<input type="hidden" name="board" value="<var $board-\>path()>" />
+		<input type="hidden" name="num" value="<var $num>" />
+		<p style="text-align:center">
+			<const S_PROMPTPASSWORD>
+			<input type="password" name="password" size="8" />
+			<input value="Edit" type="submit" />
+		</p>
+		<script type="text/javascript">set_delpass("delform")</script>
+		</form>
+	</if>
+	<if $admin_post>
+		<p style="text-align:center"><const S_PROMPTPASSWORDADMIN></p>
+	</if>
 }.MINI_FOOT_INCLUDE);
 
 use constant DELPASSWORD => compile_template (MINI_HEAD_INCLUDE. q{
@@ -581,26 +588,48 @@ use constant BAN_TEMPLATE => compile_template(q{
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-<link rel="stylesheet" type="text/css" href="http://www.desuchan.net/css/style.css" />
-<style type="text/css">
-	p {margin-left:0.5em}
-</style>
+<link rel="stylesheet" type="text/css" href="/site.css" />
 <title><const S_BADHOST> - Desuchan</title>
 </head>
-<body>
-<div style="text-align: center;">
-	<h1>Desuchan</h1>
-	<h3>"back to the internet"</h3><br />
-</div>
-<div class="content">
-	<h2 style="text-align: center;"><const S_BADHOST></h2>
-	<p align="center"><img src="<var expand_filename('/ban_images/randimg.cgi')>" alt="Ban Image" /></p>
-	<h3><const S_BAN_WHY></h3>
-	<p><const S_BAN_REASON>: <strong><var $comment></strong></p>
-	<p><const S_CURRENT_IP> <strong><var $numip></strong></p><p><if $expiration><const S_BAN_WILL_EXPIRE> <strong><var $expiration></strong>.</if>
-	<if !$expiration><const S_BAN_WILL_NOT_EXPIRE></if></p>
-	<h3><const S_BAN_APPEAL_HEADER></h3><p><var $appeal></p>
-</div>
+<body class="content">
+    <div class="top">
+        <div class="wrapper">
+            <h1>
+                <img border="0" src="desubanner.png" width="800" height="128" alt="The mother fucking banner goes here" />
+	    </h1>
+            <div class="bodywrapper">
+                <div class="subheader">
+                    Back to the Internet desu~
+		</div>
+                <div id="bannotice" class="contentbody">
+		    <div class="item">
+                        <div class="itemheader">
+			    <h3><const S_BADHOST></h3>
+			</div>
+			<div class="itemcontent">
+			    <p style="text-align:center"><img src="<var expand_filename('/include/ban_images/randimg.php')>" alt="Ban Image" /></p>
+			    <p><em><const S_BAN_WHY></em></p>
+	                    <p><const S_BAN_REASON>: <strong><var $comment></strong></p>
+	                    <p><const S_CURRENT_IP> <strong><var $numip></strong></p>
+			    <p><if $expiration><const S_BAN_WILL_EXPIRE> <strong><var $expiration></strong>.</if>
+			    	<if !$expiration><const S_BAN_WILL_NOT_EXPIRE></if></p>
+			</div>
+		    </div>
+		    <div class="item">
+		        <div class="itemheader">
+			    <h3><const S_BAN_APPEAL_HEADER></h3>
+			</div>
+			<div class="itemcontent">
+			    <p><var $appeal></p>
+			    <!-- Temporary Notice -->
+			    <p><em>(Due to changing its software base from Kareha to our global Wakaba script, you will have to post from another computer. Sorry. This will be addressed soon. &mdash;(K.) Anonymous)</em></p>
+			 </div>
+                     </div>
+                     <div class="footertext">Template Updated: 19 July 2008</div>
+		 </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 });
@@ -631,7 +660,7 @@ use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 </div>
 </if>
 <div class="passvalid" style="clear:both"><strong><const S_MANAMODE></strong></div>
-<if $admin><div style="margin-top:0;float:left">&rarr; Logged in as <span class="postername"><var $username></span> (<if $type eq 'admin'>Administrator</if><if $type eq 'mod'>Moderator</if><if $type eq 'globmod'>Global Moderator</if>). [<a href="<var $self>?task=edituserwindow&amp;username=<var $username>&amp;board=<var $board-\>path()>">Options</a>] [<a href="<var $self>?task=logout&amp;board=<var $board-\>path()>"><const S_MANALOGOUT></a>]</div>
+<if $admin><div style="margin-top:0;float:left;font-size:120%;font-weight:bold">&rarr; </div><div style="margin-top:0;margin-left:0.2em;float:left">Logged in as <span class="postername"><var $username></span> (<if $type eq 'admin'>Administrator</if><if $type eq 'mod'>Moderator</if><if $type eq 'globmod'>Global Moderator</if>). [<a href="<var $self>?task=edituserwindow&amp;username=<var $username>&amp;board=<var $board-\>path()>">Options</a>] [<a href="<var $self>?task=logout&amp;board=<var $board-\>path()>"><const S_MANALOGOUT></a>] <form action="wakaba.pl" method="get" style="display:block"><input type="hidden" name="task" value="admin" /><label>Switch to board: <select name="board"><loop $boards_select><option value="<var $board_entry>"><var $board_entry></option></loop></select></label> <input type="submit" name="switchboard" value="Go" /></form></div>
 <if $type ne 'mod'><div style="margin-top:0;float:right"><strong>Global Options:</strong> [<a href="<var $self>?task=rebuildglobal&amp;board=<var $board-\>path()>">Rebuild Cache</a>]<if $type eq 'admin'> [<a href="<var $self>?task=restart&amp;board=<var $board-\>path()>">Restart Script</a>]</if></div></if></if>
 <br clear="all"/>
 };
@@ -1096,7 +1125,7 @@ use constant POST_SEARCH => compile_template(q{<if $popup>}.MINI_HEAD_INCLUDE.q{
 		[<a href="#" target="_blank" onclick="passfield('<var $num>',true); return false">Delete</a>
 		<span id="delpostcontent<var $num>" style="display:inline"></span>
 	</span> 
-	&amp; 
+	<a href="<var $self>?task=banpopup&amp;board=<var $board-\>path()>&amp;ip=<var dec_to_dot($ip)>&amp;delete=<var $num>" onclick="popUpPost('<var $self>?task=banpopup&amp;board=<var $board-\>path()>&amp;ip=<var dec_to_dot($ip)>&amp;delete=<var $num>');return false">&amp;</a> 
 	<a href="<var $self>?task=bans&amp;board=<var $board-\>path()>&amp;ip=<var $ip>"><const S_MPBAN></a>]&nbsp;
 	[<a href="<var $self>?task=editpostwindow&amp;board=<var $board-\>path>&amp;num=<var $num>&amp;admineditmode=1" target="_blank" onclick="popUpPost('<var $self>?task=editpostwindow&amp;board=<var $board-\>path>&amp;num=<var $num>&amp;admineditmode=1'); return false">Edit</a>]
 	<if $image>
@@ -1183,11 +1212,11 @@ use constant STAFF_MANAGEMENT => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<table align="center">
 	<tbody>
 		<tr><td class="postblock">Username</td><td><input type="text" name="usernametocreate" size="16" value="" /><br /><em>Usernames must be 4-30 characters, A-Za-z0-9^._, and spaces</em></td></tr>
-		<tr><td class="postblock">Password</td><td><input type="password" name="passwordtocreate" size="16" value="" autocomplete="off" /><br /><em>Passwords must be 8-30 characters, A-Za-z0-9^._</em></td></tr>
+		<tr><td class="postblock">Password</td><td><input type="password" name="passwordtocreate" size="16" value="" /><br /><em>Passwords must be 8-30 characters, A-Za-z0-9^._</em></td></tr>
 		<tr><td class="postblock">Account Type</td><td><select name="account" onchange="if (this.form.account.value=='mod'){document.getElementById('boardselect').style.display='';} else {document.getElementById('boardselect').style.display='none';} if (this.form.account.value=='admin') {document.getElementById('managepass').style.display='';} else {document.getElementById('managepass').style.display='none';}"><option value="mod">Moderator</option><option value="globmod" selected="selected">Global Moderator</option><option value="admin">Administrator</option></select> <input type="submit" value="Create User" /></td></tr>
 		<tr id="boardselect"><td class="postblock">Controlled Boards</td>
 			<td><loop $boards><label><input type="checkbox" name="reign" value="<var $board_entry>" /> <var $board_entry></label><br /></loop></td></tr>
-		<tr id="managepass"><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" autocomplete="off" /></td></tr>
+		<tr id="managepass"><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" /></td></tr>
 	</tbody>
 	</table>
 	</form>
@@ -1238,14 +1267,14 @@ use constant STAFF_EDIT_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 		<if $user_to_edit ne $username><p align="center"><em>The management password is required only for promoting staff members to the Administrator class or editing an existing Administrator account.</em></p></if>
 		<table align="center">
 			<tbody>
-				<tr><td class="postblock">New Password</td><td><input type="password" name="newpassword" size="10" value="" autocomplete="off" /></td></tr>
+				<tr><td class="postblock">New Password</td><td><input type="password" name="newpassword" size="10" value="" /></td></tr>
 				<if $user_to_edit eq $username>
-					<tr><td class="postblock">Confirm Original Password</td><td><input type="password" name="originalpassword" size="10" value="" autocomplete="off" /> <input type="submit" value="Submit" /></td></tr>
+					<tr><td class="postblock">Confirm Original Password</td><td><input type="password" name="originalpassword" size="10" value="" /> <input type="submit" value="Submit" /></td></tr>
 				</if>
 				<if $user_to_edit ne $username>
 					<tr><td class="postblock">New Account Type</td><td><select name="newclass"><option value="mod" <if $account eq 'mod'>selected="selected"</if>>Moderator</option><option value="globmod" <if $account eq 'admin'>selected="selected"</if>>Global Moderator</option><option value="admin" <if $account eq 'admin'>selected="selected"</if>>Administrator</option></select></td></tr>
 					<tr><td class="postblock">Jurisdiction</td><td><loop $boards><label><input name="reign" type="checkbox" value="<var $board_entry>" <if $underpower>checked="checked"</if> /> <var $board_entry></label><br /></loop></td></tr>
-					<tr><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" autocomplete="off" /> <input type="submit" value="Submit" /></td></tr>
+					<tr><td class="postblock">Management Password</td><td><input type="password" name="mpass" size="10" value="" /> <input type="submit" value="Submit" /></td></tr>
 				</if>
 			</tbody>
 		</table>
@@ -1409,7 +1438,8 @@ use constant STAFF_ACTIVITY_BY_ACTIONS => compile_template(MANAGER_HEAD_INCLUDE.
 		<tr class="row<var $rowtype>">
 			<td><if $disabled><span style="color:#555555"></if><strong><var $username></strong><if $disabled></span></if></td>
 			<td><if $account eq 'admin'>Administrator</if>
-			<if $account eq 'mod'>Moderator</if></td>
+			<if $account eq 'mod'>Moderator</if>
+			<if $account eq 'globmod'>Global Moderator</if></td>
 			<td><var $info></td>
 			<td><var $date></td>
 			<td><var dec_to_dot($ip)></td>

@@ -35,7 +35,6 @@ function passfield(num,adminmode) // Bring up Password Field for [Edit] and [Del
 			field.setAttribute("id","password"+num);
 			field.setAttribute("name","postpassword");
 			field.setAttribute("size","8");
-			field.setAttribute("autocomplete","off"); // So much for standards compliance. -_- I RESERVE THE RIGHT TO HAVE A WEEABOO SMILEY HERE AS A SYMBOL OF MY FRUSTRATION
 			field.setAttribute("value", get_password("password"));
 		}
 		

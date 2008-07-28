@@ -844,22 +844,23 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# Manager and deletion stuff - duuuuuh?
 
 	# generate date
-	my $date=make_date($time+8*3600,DATE_STYLE);
+	my $date=make_date($time+TIME_OFFSET,DATE_STYLE);
 
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
-	# copy file, do checksums, make thumbnail, etc
 	 if($file)
 	 {
-		 my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
-		 my $filesth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=? WHERE num=?")
-		 	or make_error(S_SQLFAIL,1);
-		 $filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height, $num) or make_error(S_SQLFAIL);
 		 # now delete original files
 		 if ($$row{image} ne '') { unlink $$row{image}; }
 		 my $thumb=$board->path.'/'.$board->option('THUMB_DIR');
 		 if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
+		 
+		 # copy file, do checksums, make thumbnail, etc
+		 my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
+		 my $filesth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=?, size=? WHERE num=?")
+		 	or make_error(S_SQLFAIL,1);
+		 $filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$size, $num) or make_error(S_SQLFAIL);
 	 }
 	
 	# close old dbh
@@ -1575,7 +1576,9 @@ sub process_file($$$$)
 	{
 		if($$filetypes{$ext}) # externally defined filetype
 		{
-			open THUMBNAIL,$board->path().'/'.$$filetypes{$ext};
+			# Compensate for absolute paths, if given.
+			my $icon = ($$filetypes{$ext} =~ /^\//) ? substr ($$filetypes{$ext},1) : $board->path().'/'.$$filetypes{$ext};
+			open THUMBNAIL,$icon;
 			binmode THUMBNAIL;
 			($tn_ext,$tn_width,$tn_height)=analyze_image(\*THUMBNAIL,$$filetypes{$ext});
 			close THUMBNAIL;
@@ -1675,12 +1678,19 @@ sub delete_stuff($$$$$$@)
 	make_error(S_BADDELPASS) unless($password or $admin); # refuse empty password immediately
 
 	# no password means delete always
-	$password="" if($admin_deletion_mode); 
+	$password="" if($admin_deletion_mode);
+	
+	my @errors;
 
 	foreach $post (@posts)
 	{
 		$ip = delete_post($post,$password,$fileonly,$archive);
-		if($admin_deletion_mode && $ip)
+		if ($ip !~ /\d+\.\d+\.\d+\.\d+/) # Function returned with error string
+		{
+			push (@errors,"Post $post: ".$ip);
+			next;
+		}
+		if($admin_deletion_mode)
 		{
 			add_log_entry($username,'admin_delete',$board->path().','.$post.' (Poster IP '.$ip.')'.(($fileonly) ? ' (File Only)' : ''),make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0,time());
 			if ($caller ne 'internal') # If not called by mark_resolved() itself...
@@ -1697,12 +1707,21 @@ sub delete_stuff($$$$$$@)
 	build_cache();
 	if ($caller eq 'internal')
 	{ return; } # If not called directly, return to the calling function
-	elsif($admin_deletion_mode)
-	{ make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT); }
-	elsif ($caller eq 'window' && $ip)
-	{ make_http_header(); print encode_string(EDIT_SUCCESSFUL->(stylesheets=>get_stylesheets(),board=>$board));  }
-	else # $caller eq 'board' or anything else
-	{ make_http_forward($board->path.'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT); }
+	
+	if (!@errors)
+	{
+		if($admin_deletion_mode)
+		{ make_http_forward(get_secure_script_name()."?task=mpanel&board=".$board->path(),ALTERNATE_REDIRECT); }
+		elsif ($caller eq 'window' && $ip)
+		{ make_http_header(); print encode_string(EDIT_SUCCESSFUL->(stylesheets=>get_stylesheets(),board=>$board));  }
+		else # $caller eq 'board' or anything else
+		{ make_http_forward($board->path.'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT); }
+	}
+	else
+	{
+		my $errstring = join("<br />", @errors);
+		make_error($errstring);
+	}
 }
 
 sub delete_post($$$$)
@@ -1714,19 +1733,19 @@ sub delete_post($$$$)
 	my $src=$board->option('IMG_DIR');
 	my $postinfo;
 
-	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
-	$sth->execute($post) or make_error(S_SQLFAIL);
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or return S_SQLFAIL;
+	$sth->execute($post) or return S_SQLFAIL;
 
 	if($row=$sth->fetchrow_hashref())
 	{
-		make_error(S_BADDELPASS) if($password and $$row{password} ne $password);
-		make_error("This was posted by a moderator or admin and cannot be deleted this way.") if ($password and $$row{admin_post} eq 'yes');
+		return S_BADDELPASS if($password and $$row{password} ne $password);
+		return "This was posted by a moderator or admin and cannot be deleted this way." if ($password and $$row{admin_post} eq 'yes');
 
 		unless($fileonly)
 		{
 			# remove files from comment and possible replies
-			$sth=$dbh->prepare("SELECT image,thumbnail FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?") or make_error(S_SQLFAIL);
-			$sth->execute($post,$post) or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("SELECT image,thumbnail FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?") or return(S_SQLFAIL);
+			$sth->execute($post,$post) or return S_SQLFAIL;
 
 			while($res=$sth->fetchrow_hashref())
 			{
@@ -1747,8 +1766,8 @@ sub delete_post($$$$)
 			}
 
 			# remove post and possible replies
-			$sth=$dbh->prepare("DELETE FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?;") or make_error(S_SQLFAIL);
-			$sth->execute($post,$post) or make_error(S_SQLFAIL);
+			$sth=$dbh->prepare("DELETE FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?;") or return S_SQLFAIL;
+			$sth->execute($post,$post) or return S_SQLFAIL;
 		}
 		else # remove just the image and update the database
 		{
@@ -1760,8 +1779,8 @@ sub delete_post($$$$)
 				unlink $board->path.'/'.$$row{image};
 				unlink $board->path.'/'.$$row{thumbnail} if($$row{thumbnail}=~/^$thumb/);
 
-				$sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET size=0,md5=null,thumbnail=null WHERE num=?;") or make_error(S_SQLFAIL);
-				$sth->execute($post) or make_error(S_SQLFAIL);
+				$sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET size=0,md5=null,thumbnail=null WHERE num=?;") or return S_SQLFAIL;
+				$sth->execute($post) or return S_SQLFAIL;
 			}
 		}
 
@@ -1869,6 +1888,7 @@ sub make_admin_post_panel($$)
 			lockedthread=>$thread[0]{locked},
 			type=>$type,
 			parent=>$page,
+			boards_select=>get_reign($username),
 			stylesheets=>get_stylesheets()));
 	}
 	else
@@ -1946,6 +1966,7 @@ sub make_admin_post_panel($$)
 			reportedposts=>\@reportedposts,
 			type=>$type,
 			pages=>\@pages,
+			boards_select=>get_reign($username),
 			stylesheets=>get_stylesheets()));
 	}
 }
@@ -1975,7 +1996,7 @@ sub make_admin_ban_panel($$)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(BAN_PANEL_TEMPLATE->(admin=>$admin,bans=>\@bans,ip=>$ip,username=>$username,type=>$type, stylesheets=>get_stylesheets(),board=>$board));
+	print encode_string(BAN_PANEL_TEMPLATE->(admin=>$admin,bans=>\@bans,ip=>$ip,username=>$username,type=>$type, stylesheets=>get_stylesheets(),boards_select=>get_reign($username),board=>$board));
 }
 
 sub add_ip_ban_window($$@) # Generate ban popup window
@@ -2106,7 +2127,7 @@ sub make_admin_proxy_panel($)
 	$sth->finish();
 
 	make_http_header();
-	print encode_string(PROXY_PANEL_TEMPLATE->(admin=>$admin,scanned=>\@scanned,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board));
+	print encode_string(PROXY_PANEL_TEMPLATE->(admin=>$admin,scanned=>\@scanned,username=>$username,type=>$type,stylesheets=>get_stylesheets(),boards_select=>get_reign($username),board=>$board));
 }
 
 sub make_admin_spam_panel($)
@@ -2127,6 +2148,7 @@ sub make_admin_spam_panel($)
 	board=>$board,
 	spamlines=>scalar @spam,
 	username=>$username, type=>$type,
+	boards_select=>get_reign($username),
 	spam=>join "\n",map { clean_string($_,1) } @spam, ));
 }
 
@@ -2159,6 +2181,7 @@ sub make_sql_dump($)
 		type=>$type,
 		stylesheets=>get_stylesheets(),
 		board=>$board,
+		boards_select=>get_reign($username),
 		database=>join "<br />",map { clean_string($_,1) } @database
 	));
 }
@@ -2204,6 +2227,7 @@ sub make_sql_interface($$$)
 		nuke=>$nuke,
 		stylesheets=>get_stylesheets(),
 		board=>$board,
+		boards_select=>get_reign($username),
 		results=>join "<br />",map { clean_string($_,1) } @results
 	));
 }
@@ -2284,7 +2308,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my @page_setting_hidden_inputs = ({name=>'usertoview',value=>$user_to_view},{name=>'board',value=>$board->path()},{name=>'task',value=>'stafflog'},{name=>'view',value=>$view},{name=>'posttoview',value=>$post_to_view},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby});
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_view=>$user_to_view,rowcount=>$count,perpage=>$perpage,page=>$page,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;usertoview=$user_to_view",entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
+		print encode_string(STAFF_ACTIVITY_BY_USER->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_view=>$user_to_view,rowcount=>$count,perpage=>$perpage,page=>$page,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;usertoview=$user_to_view",entries=>\@entries,boards_select=>get_reign($username),inputs=>\@page_setting_hidden_inputs));
 	}
 	elsif ($view eq 'action')
 	{
@@ -2316,7 +2340,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my @page_setting_hidden_inputs = ({name=>'actiontoview',value=>$action_to_view},{name=>'board',value=>$board->path()},{name=>'task',value=>'stafflog'},{name=>'view',value=>$view},{name=>'posttoview',value=>$post_to_view},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby}); 
 
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,rowcount=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;actiontoview=$action_to_view",entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
+		print encode_string(STAFF_ACTIVITY_BY_ACTIONS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,action_name=>$action_name,content_name=>$action_content,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,rowcount=>$count,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;actiontoview=$action_to_view",boards_select=>get_reign($username),entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
 	}
 	elsif ($view eq 'ip')
 	{
@@ -2346,7 +2370,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my @page_setting_hidden_inputs = ({name=>'board',value=>$board->path()},{name=>'task',value=>'stafflog'},{name=>'view',value=>$view},{name=>'iptoview',value=>$ip_to_view},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby}); 
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,ip_to_view=>$ip_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;iptoview=$ip_to_view",entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
+		print encode_string(STAFF_ACTIVITY_BY_IP_ADDRESS->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,ip_to_view=>$ip_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;iptoview=$ip_to_view",boards_select=>get_reign($username),entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
 	}
 	elsif ($view eq 'post')
 	{
@@ -2376,7 +2400,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my @page_setting_hidden_inputs = ({name=>'board',value=>$board->path()},{name=>'task',value=>'stafflog'},{name=>'view',value=>$view},{name=>'posttoview',value=>$post_to_view},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby}); 
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,post_to_view=>$post_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;posttoview=$post_to_view",entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
+		print encode_string(STAFF_ACTIVITY_BY_POST->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,post_to_view=>$post_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,staff=>\@staff,sortby=>$sortby,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;view=$view&amp;sortby=$sortby&amp;order=$order&amp;posttoview=$post_to_view",boards_select=>get_reign($username),entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
 	}
 	else
 	{
@@ -2406,7 +2430,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 		my @page_setting_hidden_inputs = ({name=>'board',value=>$board->path()},{name=>'task',value=>'stafflog'},{name=>'view',value=>$view},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby}); 
 		
 		make_http_header();
-		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;sortby=$sortby&amp;order=$order",entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
+		print encode_string(STAFF_ACTIVITY_UNFILTERED->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,action=>$action_to_view,rowcount=>$count,page=>$page,perpage=>$perpage,number_of_pages=>$number_of_pages,view=>$view,sortby=>$sortby,staff=>\@staff,order=>$order,rooturl=>get_secure_script_name()."?task=stafflog&amp;board=".$board->path()."&amp;sortby=$sortby&amp;order=$order",boards_select=>get_reign($username),entries=>\@entries,inputs=>\@page_setting_hidden_inputs));
 	}
 }
 
@@ -2467,6 +2491,30 @@ sub get_action_name($;$)
 
 sub get_reign($)
 {
+	my $username=$_[0];
+	my @return_AoH; # Array of Hashes whose reference to return for <loop>ing in futaba_style.pl
+	
+	my $sth=$dbh->prepare("SELECT reign FROM `".SQL_ACCOUNT_TABLE."` WHERE username=?;") or make_error(S_SQLFAIL);
+	$sth->execute($username) or make_error(S_SQLFAIL);
+	my $reign_string = ($sth->fetchrow_array)[0];
+	$sth->finish();
+	
+	if ($reign_string)
+	{
+		my @boards = split (/ /, $reign_string);
+		
+		foreach my $board (@boards)
+		{
+			my $row = {board_entry=>$board};
+			push  @return_AoH, $row;
+		}
+	}
+	else
+	{
+		@return_AoH = get_boards();
+	}
+	
+	return \@return_AoH;
 }
 
 #
@@ -2495,7 +2543,7 @@ sub search_posts($$$$$$)
 		
 		# Pagination
 
-		$perpage = 10 if (!$perpage || $perpage !~ /^\d+$/);
+		$perpage = 25 if (!$perpage || $perpage !~ /^\d+$/);
 		$page = 1 if (!$page || $page !~ /^\d+$/);
 		
 		($page,$perpage,$count,$number_of_pages,$offset,$first_entry_for_page,$final_entry_for_page) = get_page_limits($page,$perpage,$count);
@@ -2540,7 +2588,7 @@ sub search_posts($$$$$$)
 	}
 	
 	make_http_header();
-	print encode_string(POST_SEARCH->(board=>$board,username=>$username,type=>$type,num=>$query_string,posts=>\@posts,search=>$search_type,stylesheets=>get_stylesheets(),rooturl=>get_secure_script_name().'?task=searchposts&amp;board='.$board->path().'&amp;caller='.$caller.'&amp;ipsearch=1&amp;ip='.$query_string,rowcount=>$count,perpage=>$perpage,page=>$page,number_of_pages=>$number_of_pages,popup=>$popup,admin=>$admin));
+	print encode_string(POST_SEARCH->(board=>$board,username=>$username,type=>$type,num=>$query_string,posts=>\@posts,search=>$search_type,stylesheets=>get_stylesheets(),rooturl=>get_secure_script_name().'?task=searchposts&amp;board='.$board->path().'&amp;caller='.$caller.'&amp;ipsearch=1&amp;ip='.$query_string,rowcount=>$count,perpage=>$perpage,page=>$page,number_of_pages=>$number_of_pages,popup=>$popup,boards_select=>get_reign($username),admin=>$admin));
 }
 
 #
@@ -2764,10 +2812,13 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	# Assess changes made
 	$changes .= "comment, " if ($comment ne $$row{comment});
 	$changes .= "expiration date, " if ($expiration != $$row{expiration});
-	$changes .= "IP address (original: ".dec_to_dot($$row{ival1}).", new: $ival1), " if ($ival1 ne dec_to_dot($$row{ival1}));
+	$changes .= "IP address (new: $ival1), " if ($ival1 ne dec_to_dot($$row{ival1}));
 	$changes .= "string (original: ".$$row{sval1}.", new: $sval1), " if ($sval1 ne $$row{sval1});
 	$changes .= "subnet mask (original: ".dec_to_dot($$row{ival2}).", new: $ival2), " if ($ival2 ne dec_to_dot($$row{ival2}));
+	$changes .= "banned from browsing, " if ($not_total_before && $total);
+	$changes .= "unbanned from browsing, " if ($$row{total} eq 'yes' && !$total);
 	$changes = substr($changes, 0, -2);
+	$changes .= " (Affected IP address: ".dec_to_dot($$row{ival1}).")" if ($$row{ival1});
 	
 	# Close old handler
 	$verify->finish;
@@ -2937,7 +2988,7 @@ sub add_htaccess_entry($)
 	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
 	print HTACCESS "\n".'# Ban added by Wakaba'."\n";
 	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS 'RewriteRule !(\.pl|\.js$|\.css$|\.php$|sugg|ban_images) '.$ENV{SCRIPT_NAME}.'?task=banreport&board='.$board->path()."\n";
+	print HTACCESS 'RewriteRule !(\.pl|\.js$|\.css$|desubanner\.png|sugg|ban_images) '.$ENV{SCRIPT_NAME}.'?task=banreport&board='.$board->path()."\n";
 	# mod_rewrite entry. May need to be changed for different server software
 	close HTACCESS;
 }
@@ -2945,13 +2996,12 @@ sub add_htaccess_entry($)
 sub remove_htaccess_entry($)
 {
 	my $ip = $_[0];
-	$ip =~ s/\./\\\\\./g;
 	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
 	my $file_contents = do { local $/; <HTACCESSREAD> };
-	if ($file_contents =~ m/\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\) \/wakaba.pl\?task\=banreport\&board\=\w*?\n?/)
-	{
-		$file_contents =~ s/(.*)\n\r?\# Ban added by Wakaba.*?RewriteCond.*?$ip.*?RewriteRule\s+\!\(.*?\) \/wakaba.pl\?task\=banreport\&board\=\w*?\n?(.*)/$1$2/s;
-	}
+        if ($file_contents =~ m/\n\# Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n/)
+        {
+                $file_contents =~ s/\n\# Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n//;
+        }
 	close HTACCESSREAD;
 	open (HTACCESSWRITE, ">".HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
 	print HTACCESSWRITE $file_contents;
@@ -2997,7 +3047,7 @@ sub manage_staff($)
 	my @boards = get_boards();
 
 	make_http_header();
-	print encode_string(STAFF_MANAGEMENT->(admin=>$admin, username=>$username, type=>$type, stylesheets=>get_stylesheets(), boards=>\@boards, board=>$board, users=>\@users));
+	print encode_string(STAFF_MANAGEMENT->(admin=>$admin, username=>$username, type=>$type, stylesheets=>get_stylesheets(), boards_select=>get_reign($username), boards=>\@boards, board=>$board, users=>\@users));
 }
 
 sub make_remove_user_account_window($$)
@@ -3018,7 +3068,7 @@ sub make_remove_user_account_window($$)
 	$sth->finish();
 	
 	make_http_header();
-	print encode_string(STAFF_DELETE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_delete=>$user_to_delete));
+	print encode_string(STAFF_DELETE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),boards_select=>get_reign($username),board=>$board,account=>$account,user_to_delete=>$user_to_delete));
 }
 
 sub remove_user_account($$$)
@@ -3065,7 +3115,7 @@ sub make_disable_user_account_window($$)
 	$sth->finish();
 	
 	make_http_header();
-	print encode_string(STAFF_DISABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_disable=>$user_to_disable));
+	print encode_string(STAFF_DISABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,boards_select=>get_reign($username),account=>$account,user_to_disable=>$user_to_disable));
 }
 
 sub disable_user_account($$$)
@@ -3109,7 +3159,7 @@ sub make_enable_user_account_window($$)
 	$sth->finish();
 	
 	make_http_header();
-	print encode_string(STAFF_ENABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,account=>$account,user_to_enable=>$user_to_enable));
+	print encode_string(STAFF_ENABLE_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,boards_select=>get_reign($username),account=>$account,user_to_enable=>$user_to_enable));
 }
 
 sub enable_user_account($$$)
@@ -3169,7 +3219,7 @@ sub make_edit_user_account_window($$)
 	$sth->finish();
 	
 	make_http_header();
-	print encode_string(STAFF_EDIT_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_edit=>$user_to_edit,boards=>\@boards,account=>$account));
+	print encode_string(STAFF_EDIT_TEMPLATE->(admin=>$admin,username=>$username,type=>$type,stylesheets=>get_stylesheets(),board=>$board,user_to_edit=>$user_to_edit,boards_select=>get_reign($username),boards=>\@boards,account=>$account));
 }
 
 sub edit_user_account($$$$$$@)
@@ -3580,7 +3630,7 @@ sub make_report_page($$$$$)
 	my @page_setting_hidden_inputs = ({name=>'task', value=>'reports'},{name=>'board',value=>$board->path()},{name=>'order',value=>$order},{name=>'sortby',value=>$sortby});
 	
 	make_http_header();
-	print encode_string(REPORT_PANEL_TEMPLATE->(admin=>$admin,board=>$board,username=>$username,type=>$type,reports=>\@reports,page=>$page,perpage=>$perpage,rowcount=>$count,stylesheets=>get_stylesheets(),rooturl=>get_secure_script_name()."?task=reports&amp;board=".$board->path()."&amp;sortby=$sortby&amp;order=$order",number_of_pages=>$number_of_pages,inputs=>\@page_setting_hidden_inputs)); 
+	print encode_string(REPORT_PANEL_TEMPLATE->(admin=>$admin,board=>$board,username=>$username,type=>$type,reports=>\@reports,page=>$page,perpage=>$perpage,rowcount=>$count,stylesheets=>get_stylesheets(),rooturl=>get_secure_script_name()."?task=reports&amp;board=".$board->path()."&amp;sortby=$sortby&amp;order=$order",number_of_pages=>$number_of_pages,boards_select=>get_reign($username),inputs=>\@page_setting_hidden_inputs)); 
 }
 
 sub make_resolved_report_page($$$$$)

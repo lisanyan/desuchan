@@ -181,7 +181,7 @@ use constant S_UNLOCKOPTION => "Unlock";								# Option for unlocking a thread 
 use constant S_LOCKEDANNOUNCE => "This thread is locked. You may not reply to this thread.";		# An announcement that appears in place of the post form in a locked thread
 use constant S_VIEW => "View";										# Link to viewing the thread page if the thread is locked (and does not allow replies).
 # Prompt for management password when editing a moderator post or moderator-edited post.
-use constant S_PROMPTPASSWORDADMIN => "This post was created and/or edited by a moderator.<br />Please enter the password for management. ";
+use constant S_PROMPTPASSWORDADMIN => "This post was created and/or edited by a moderator.";
 # Prompt for editing/deletion password for usual circumstances.
 use constant S_PROMPTPASSWORD => "Please enter the deletion/editing password. ";
 use constant S_NEWFILE => "New File";									# Prompt for replacement file in post-editing window
