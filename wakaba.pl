@@ -26,7 +26,7 @@ BEGIN { require "wakautils.pl"; }
 my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
 my $dbh;
 
-
+# Set up character set conversion
 my ($has_encode);
 
 if(CONVERT_CHARSETS)
@@ -35,9 +35,13 @@ if(CONVERT_CHARSETS)
 	$has_encode=1 unless($@);
 }
 
+# Sanity checks for constants
+my $page_ext = (PAGE_EXT =~ /^\./) ? PAGE_EXT : '.'.PAGE_EXT;
 
-return 1 if(caller); # stop here if we're being called externally
+# stop here if we're being called externally
+return 1 if(caller); 
 
+# FastCGI Setup
 my ($query, $board);
 my $count = 0;
 my $handling_request = 0;
@@ -146,9 +150,9 @@ sub build_cache()
 	}
 
 	# check for and remove old pages
-	while(-e $board->path().'/'.$page.PAGE_EXT)
+	while(-e $board->path().'/'.$page.$page_ext)
 	{
-		unlink $board->path().'/'.$page.PAGE_EXT;
+		unlink $board->path().'/'.$page.$page_ext;
 		$page++;
 	}
 	
@@ -161,7 +165,7 @@ sub build_cache_page($$@)
 	my ($filename,$tmpname);
 
 	if($page==0) { $filename=$board->path().'/'.$board->option('HTML_SELF'); }
-	else { $filename=$board->path().'/'.$page.PAGE_EXT; }
+	else { $filename=$board->path().'/'.$page.$page_ext; }
 
 	# do abbrevations and such
 	foreach my $thread (@threads)
@@ -205,7 +209,7 @@ sub build_cache_page($$@)
 	foreach my $p (@pages)
 	{
 		if($$p{page}==0) { $$p{filename}=expand_filename($board->option('HTML_SELF')) } # first page
-		else { $$p{filename}=expand_filename($$p{page}.PAGE_EXT) }
+		else { $$p{filename}=expand_filename($$p{page}.$page_ext) }
 		if($$p{page}==$page) { $$p{current}=1 } # current page, no link
 	}
 
@@ -241,7 +245,7 @@ sub build_thread_cache($)
 
 	make_error(S_NOTHREADERR) if($thread[0]{parent});
 
-	$filename=$board->path().'/'.$board->option('RES_DIR').$thread.PAGE_EXT;
+	$filename=$board->path().'/'.$board->option('RES_DIR').$thread.$page_ext;
 
 	print_page($filename,PAGE_TEMPLATE->(
 		threads=>[{posts=>\@thread}],
@@ -570,7 +574,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 		
 		# ...unless we have "noko" (a la 4chan)--then forward to thread
 		# ($parent contains current post number if a new thread was posted)
-		make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent.PAGE_EXT,ALTERNATE_REDIRECT);
+		make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent.$page_ext,ALTERNATE_REDIRECT);
 	}
 	else
 	{
@@ -1794,8 +1798,8 @@ sub delete_post($$$$)
 					my $captcha = $board->option('CAPTCHA_SCRIPT');
 					my $line;
 
-					open RESIN, '<', $board->path.'/'.$board->option('RES_DIR').$$row{num}.PAGE_EXT;
-					open RESOUT, '>', $board->path.'/'.$board->option('ARCHIVE_DIR').$board->option('RES_DIR').$$row{num}.PAGE_EXT;
+					open RESIN, '<', $board->path.'/'.$board->option('RES_DIR').$$row{num}.$page_ext;
+					open RESOUT, '>', $board->path.'/'.$board->option('ARCHIVE_DIR').$board->option('RES_DIR').$$row{num}.$page_ext;
 					while($line = <RESIN>)
 					{
 						$line =~ s/img src="(.*?)$thumb/img src="$1$archive$thumb/g;
@@ -1814,7 +1818,7 @@ sub delete_post($$$$)
 					close RESIN;
 					close RESOUT;
 				}
-				unlink $board->path.'/'.$board->option('RES_DIR').$$row{num}.PAGE_EXT;
+				unlink $board->path.'/'.$board->option('RES_DIR').$$row{num}.$page_ext;
 			}
 			else # removing parent image
 			{
@@ -2022,9 +2026,10 @@ sub confirm_ip_ban($$$$$$$@)
 		}
 	}
 	
-	if ($delete) # If there is only one post selected for baleetion, nuke it.
+	if ($delete && !$delete_all) # If there is only one post selected for baleetion, nuke it.
 	{
 		delete_stuff('',0,'',$admin,1,'internal',($delete));
+		mark_resolved($admin,'','internal',($board->path=>[$delete])); # Set it as resolved if reported earlier.
 	}
 	
 	# redirect to confirmation page
@@ -2703,7 +2708,7 @@ sub do_rebuild_cache($;$)
 	# Is moderator banned?
 	ban_admin_check(dot_to_dec($ENV{REMOTE_ADDR}), $admin) unless is_whitelisted(dot_to_dec($ENV{REMOTE_ADDR}));
 
-	unlink glob $board->path().'/'.$board->option('RES_DIR').'*'.PAGE_EXT;
+	unlink glob $board->path().'/'.$board->option('RES_DIR').'*'.$page_ext;
 
 	repair_database();
 	build_thread_cache_all();
@@ -2912,8 +2917,11 @@ sub delete_all($$$$)
 	$sth->execute($mask,$ip,$mask) or make_error(S_SQLFAIL);
 	while($row=$sth->fetchrow_hashref()) { push(@posts,$$row{num}); }
 	$sth->finish();
-
 	delete_stuff('',0,0,$admin,1,'internal',@posts);
+	
+	# Set up post resolution
+	mark_resolved($admin,'','internal',($board->path()=>@posts));
+	
 	make_http_forward($ENV{HTTP_REFERER},ALTERNATE_REDIRECT) unless $caller eq 'internal';
 }
 
@@ -3376,8 +3384,8 @@ sub get_reply_link($$)
 {
 	my ($reply,$parent)=@_;
 
-	return expand_filename($board->option('RES_DIR').$parent.PAGE_EXT).'#'.$reply if($parent);
-	return expand_filename($board->option('RES_DIR').$reply.PAGE_EXT);
+	return expand_filename($board->option('RES_DIR').$parent.$page_ext).'#'.$reply if($parent);
+	return expand_filename($board->option('RES_DIR').$reply.$page_ext);
 }
 
 sub get_page_count($$$)
@@ -4963,8 +4971,8 @@ while ( $query = new CGI::Fast )
 	{
 		my $admin = $query->cookie("wakaadmin");
 		my $management_password = $query->param("mpass"); # Necessary for creating in Admin class
-		my $username = $query->param("usernametocreate");
-		my $password = $query->param("passwordtocreate");
+		my $username = $query->param("usertocreate");
+		my $password = $query->param("passtocreate");
 		my $type = $query->param("account");
 		my @reign = $query->param("reign");
 		create_user_account($admin,$username,$password,$type,$management_password,@reign);

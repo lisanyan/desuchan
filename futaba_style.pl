@@ -76,19 +76,19 @@ use constant MINI_HEAD_INCLUDE => q{
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
-body { margin: 0; padding: 8px; margin-bottom: auto; }
-blockquote blockquote { margin-left: 0em }
-form { margin-bottom: 0px }
-form .trap { display:none }
-.postarea { text-align: center }
-.postarea table { margin: 0px auto; text-align: left }
-.thumb { border: none; float: left; margin: 2px 20px }
-.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
-.reply blockquote, blockquote :last-child { margin-bottom: 0em }
-.reflink a { color: inherit; text-decoration: none }
-.reply .filesize { margin-left: 20px }
-.userdelete { float: right; text-align: center; white-space: nowrap }
-.replypage .replylink { display: none }
+	body { margin: 0; padding: 8px; margin-bottom: auto; }
+	blockquote blockquote { margin-left: 0em }
+	form { margin-bottom: 0px }
+	form .trap { display:none }
+	.postarea { text-align: center }
+	.postarea table { margin: 0px auto; text-align: left }
+	.thumb { border: none; float: left; margin: 2px 20px }
+	.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
+	.reply blockquote, blockquote :last-child { margin-bottom: 0em }
+	.reflink a { color: inherit; text-decoration: none }
+	.reply .filesize { margin-left: 20px }
+	.userdelete { float: right; text-align: center; white-space: nowrap }
+	.replypage .replylink { display: none }
 </style>
 
 <loop $stylesheets>
@@ -1211,8 +1211,8 @@ use constant STAFF_MANAGEMENT => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<p align="center"><em>The management password is necessary only for creating administrator accounts.<br />Global moderators oversee all boards.</em></p>
 	<table align="center">
 	<tbody>
-		<tr><td class="postblock">Username</td><td><input type="text" name="usernametocreate" size="16" value="" /><br /><em>Usernames must be 4-30 characters, A-Za-z0-9^._, and spaces</em></td></tr>
-		<tr><td class="postblock">Password</td><td><input type="password" name="passwordtocreate" size="16" value="" /><br /><em>Passwords must be 8-30 characters, A-Za-z0-9^._</em></td></tr>
+		<tr><td class="postblock">Username</td><td><input type="text" name="usertocreate" size="16" value="" /><br /><em>Usernames must be 4-30 characters, A-Za-z0-9^._, and spaces</em></td></tr>
+		<tr><td class="postblock">Password</td><td><input type="password" name="passtocreate" size="16" value="" /><br /><em>Passwords must be 8-30 characters, A-Za-z0-9^._</em></td></tr>
 		<tr><td class="postblock">Account Type</td><td><select name="account" onchange="if (this.form.account.value=='mod'){document.getElementById('boardselect').style.display='';} else {document.getElementById('boardselect').style.display='none';} if (this.form.account.value=='admin') {document.getElementById('managepass').style.display='';} else {document.getElementById('managepass').style.display='none';}"><option value="mod">Moderator</option><option value="globmod" selected="selected">Global Moderator</option><option value="admin">Administrator</option></select> <input type="submit" value="Create User" /></td></tr>
 		<tr id="boardselect"><td class="postblock">Controlled Boards</td>
 			<td><loop $boards><label><input type="checkbox" name="reign" value="<var $board_entry>" /> <var $board_entry></label><br /></loop></td></tr>
