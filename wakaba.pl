@@ -644,26 +644,24 @@ sub tag_killa($) # subroutine for stripping HTML tags and supplanting them with 
 	{
 		my $replace = $1;
 		my $replace2 = $replace;
-		my @strings = split (/<\/li>/, $replace2);
-		foreach my $entry (@strings)
-		{
-			$entry =~ s/<li>/\* /;
-		}
-		$replace2 = join ("\n", @strings);
-		$tag_killa =~ s/<ul>$replace<\/ul>/$replace2\n\n/gs;
+		$replace2 =~ s/<li>/\* /g;
+		$replace2 =~ s/<\/li>/\n/g;
+		$tag_killa =~ s/<ul>$replace<\/ul>/$replace2\n/s;
 	}
 	while ($tag_killa =~ m/<ol>(.*?)<\/ol>/)
 	{
 		my $replace = $1;
 		my $replace2 = $replace;
 		my @strings = split (/<\/li>/, $replace2);
-		my $count = 0;
+		my @new_strings;
+		my $count = 1;
 		foreach my $entry (@strings)
 		{
-			$count++;
 			$entry =~ s/<li>/$count\. /;
+			push @new_strings, $entry;
+			$count++;
 		}
-		$replace2 = join ("\n", @strings);
+		$replace2 = join ("\n", @new_strings);
 		$tag_killa =~ s/<ol>$replace<\/ol>/$replace2\n\n/gs;
 	}	
 	$tag_killa =~ s/<\/?em>/\*/g;
