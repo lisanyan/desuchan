@@ -23,7 +23,7 @@ BEGIN { require "wakautils.pl"; }
 # Global init
 #
 
-my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim|AIM)/;
+my $protocol_re=qr/(?:http|https|ftp|mailto|nntp|aim)/i;
 my $dbh;
 
 # Set up character set conversion
@@ -94,7 +94,8 @@ sub sig_handler {
 # Database
 #
 
-sub get_conn() {
+sub get_conn() 
+{
     return $MyPackage::dbh if ($MyPackage::dbh && $MyPackage::dbh->ping);
 
     # we don't have connection or the connection timed out, so make a new one
@@ -308,9 +309,9 @@ sub build_thread_cache_all()
 # Posting
 #
 
-sub post_stuff($$$$$$$$$$$$$$$$$)
+sub post_stuff($$$$$$$$$$$$$$$$$$$)
 {
-	my ($parent,$name,$email,$subject,$comment,$file,$uploadname,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,$postfix,$sticky,$lock,$admin_post_mode)=@_;
+	my ($parent,$name,$email,$subject,$comment,$file,$uploadname,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,$oekaki_post,$srcinfo,$pch,$sticky,$lock,$admin_post_mode)=@_;
 	
 	# get a timestamp for future use
 	my $time=time();
@@ -489,7 +490,6 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 
 	# format comment
 	$comment=format_comment(clean_string(decode_string($comment,CHARSET))) unless $no_format;
-	$comment.=$postfix;
 
 	# insert default values for empty fields
 	$parent=0 unless $parent;
@@ -510,7 +510,18 @@ sub post_stuff($$$$$$$$$$$$$$$$$)
 
 	# copy file, do checksums, make thumbnail, etc
 	my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$parent) if($file);
+	
+	if ($oekaki_post && $board->option('ENABLE_OEKAKI'))
+	{
+		my $new_pch_filename = '';
+		$new_pch_filename = copy_animation_file($pch,$filename) if ($pch);	# If applicable, copy PCH file with the same filename base as the file we just copied.
+		my $postfix = OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$uploadname,$new_pch_filename));
 
+		# Attach Oekaki Postfix
+		$comment.=$postfix;
+	}
+
+	# Make sure sticky is a numeric 0.
 	$sticky = 0 if (!$sticky);
 	
 	# finally, write to the database
@@ -621,8 +632,7 @@ sub tag_killa($) # subroutine for stripping HTML tags and supplanting them with 
 	my $tag_killa = $_[0];
 	study $tag_killa; # Prepare string for some extensive regexp.
 
-	$tag_killa =~ s/<p><small><strong> Oekaki post<\/strong> \(Time\:.*?<\/small><\/p>//; # Strip Oekaki postfix.
-	$tag_killa =~ s/<p><small><strong> Edited in Oekaki<\/strong> \(Time\:.*?<\/small><\/p>//; # Strip Oekaki edit postfix
+	$tag_killa =~ s/<p(?: class="oekinfo">|>\s*<small>)\s*<strong>(?:Oekaki post|Edited in Oekaki)<\/strong>\s*\(Time\:.*?<\/p>//i; # Strip Oekaki postfix.
 	$tag_killa =~ s/<br\s?\/?>/\n/g;
 	$tag_killa =~ s/<\/p>$//;
 	$tag_killa =~ s/<\/p>/\n\n/g;
@@ -640,15 +650,15 @@ sub tag_killa($) # subroutine for stripping HTML tags and supplanting them with 
 		}
 		$tag_killa =~ s/<\s*?code>$replace<\/\s*?code>/$replace2\n/s;
 	}
-	while ($tag_killa =~ m/<ul>(.*?)<\/ul>/)
+	while ($tag_killa =~ m/<ul>(.*?)<\/ul>/s)
 	{
-		my $replace = $1;
+		my $replace = $1 || $2;
 		my $replace2 = $replace;
 		$replace2 =~ s/<li>/\* /g;
 		$replace2 =~ s/<\/li>/\n/g;
-		$tag_killa =~ s/<ul>$replace<\/ul>/$replace2\n/s;
+		$tag_killa =~ s/<ul>.*?<\/ul>/${replace2}\n/s;
 	}
-	while ($tag_killa =~ m/<ol>(.*?)<\/ol>/)
+	while ($tag_killa =~ m/<ol>(.*?)<\/ol>/s)
 	{
 		my $replace = $1;
 		my $replace2 = $replace;
@@ -658,11 +668,11 @@ sub tag_killa($) # subroutine for stripping HTML tags and supplanting them with 
 		foreach my $entry (@strings)
 		{
 			$entry =~ s/<li>/$count\. /;
-			push @new_strings, $entry;
+			push (@new_strings, $entry);
 			$count++;
 		}
 		$replace2 = join ("\n", @new_strings);
-		$tag_killa =~ s/<ol>$replace<\/ol>/$replace2\n\n/gs;
+		$tag_killa =~ s/<ol>.*?<\/ol>/${replace2}\n\n/s;
 	}	
 	$tag_killa =~ s/<\/?em>/\*/g;
 	$tag_killa =~ s/<\/?strong>/\*\*/g;
@@ -686,9 +696,9 @@ sub password_window($$$)
 }
 	
 
-sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
+sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 {
-	my ($num,$name,$email,$subject,$comment,$file,$uploadname,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip,$admin_editing_mode)=@_;
+	my ($num,$name,$email,$subject,$comment,$file,$uploadname,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$pch,$killtrip,$admin_editing_mode)=@_;
 	# get a timestamp for future use
 	my $time=time();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
 	
@@ -811,30 +821,53 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# format comment
 	$comment=format_comment(clean_string(decode_string($comment,CHARSET))) unless $no_format;
 	
+	# Boolean variable for whether or not PCH file should be replaced by newly uploaded copy.
+	my $replace_pch = 0;
+	
+	# Original PCH
+	my $original_pch = '';
+	
 	# check for past oekaki postfix and attach it to the current comment if necessary
 	if (!$postfix && !$admin_editing_mode && !$file)
 	{
-		if ($$row{comment} =~ m/(<p><small><strong>\s*(Oekaki post|Edited in Oekaki)\s*<\/strong> \(Time\:.*?<\/small><\/p>)/)
+		if ($$row{comment} =~ m/(<p(?: class="oekinfo">|>\s*<small>)\s*<strong>(?:Oekaki post|Edited in Oekaki)<\/strong>\s*\(Time\:.*?<\/p>)/i)
 		{
 			$comment.=$1;
 		}
 	}
 	elsif ($file && $postfix)
 	{
-		if ($$row{comment} =~ m/(<p><small><strong>\s*Oekaki post\s*<\/strong> \(Time\:.*?<\/small><\/p>)/)
+		if ($$row{comment} =~ m/(<p(?: class="oekinfo">|>\s*<small>)\s*<strong>(?:Oekaki post|Edited in Oekaki)<\/strong>\s*\(Time\:.*?<\/p>)/i)
 		{
 			my $oekaki_original = $1;
-			$oekaki_original =~ s/<\/small><\/p>//;
+			$oekaki_original =~ s/<\/p>$//;
+			$oekaki_original =~ s/<p>/<p class=\"oekinfo\">/;	# Get rid of the old HTML formatting
+			$oekaki_original =~ s/<\/?small>//g;
 			$comment.=$oekaki_original;
-			$postfix =~ s/<p><small><strong>/<br \/><strong>/;
+			$postfix =~ s/^<p class="oekinfo">/<br \/>/;
 		}
-		$comment.=$postfix;
+		
+		if ($$row{image})
+		{
+			# If there is an existent PCH file and we have a new one, replace.
+			$original_pch = find_pch($$row{image});
+			if (-e $board->path().'/'.$original_pch)
+			{
+				unlink './'.$board->path().'/'.$original_pch;
+				$replace_pch = 1 if $pch;
+			}
+		}
+		else
+		{
+			make_error(S_HAXORING);
+		}
 	}
-	else
-	{
-		$comment.=$postfix; # If there is a file and no postfix, then we'll attach the empty variable
-	}
+	
+	# If there is a file and no postfix, it is not an Oekaki edit.
 
+	# attach postfix
+	$comment.=$postfix;
+	
 	# insert default values for empty fields
 	$name=make_anonymous($ip,$time) unless $name or $trip;
 	$subject=$board->option('S_ANOTITLE') unless $subject;
@@ -851,19 +884,29 @@ sub edit_shit($$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
-	 if($file)
-	 {
-		 # now delete original files
-		 if ($$row{image} ne '') { unlink $$row{image}; }
-		 my $thumb=$board->path.'/'.$board->option('THUMB_DIR');
-		 if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
-		 
-		 # copy file, do checksums, make thumbnail, etc
-		 my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
-		 my $filesth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=?, size=? WHERE num=?")
-		 	or make_error(S_SQLFAIL,1);
-		 $filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$size, $num) or make_error(S_SQLFAIL);
-	 }
+	if($file)
+	{
+		# now delete original files
+		if ($$row{image} ne '') { unlink $board->path().'/'.$$row{image}; }
+		my $thumb=$board->path.'/'.$board->option('THUMB_DIR');
+		if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
+		
+		# copy file, do checksums, make thumbnail, etc
+		my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
+		my $filesth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET image=?, md5=?, width=?, height=?, thumbnail=?,tn_width=?,tn_height=?, size=? WHERE num=?")
+			or make_error(S_SQLFAIL,1);
+		$filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$size, $num) or make_error(S_SQLFAIL);
+	
+		if ($replace_pch)
+		{
+			my $new_pch = copy_animation_file($pch,$filename);
+			$comment =~ s/\Q$original_pch\E/${new_pch}/g;
+		}
+		else
+		{
+			$comment =~ s/,\s*Animation:\s*\[<a href=.*?View<\/a>.*\)\s*<\/p>//;	# *shouldn't* happen
+		}
+	}
 	
 	# close old dbh
 	$select->finish(); 
@@ -1742,27 +1785,32 @@ sub delete_post($$$$)
 	{
 		return S_BADDELPASS if($password and $$row{password} ne $password);
 		return "This was posted by a moderator or admin and cannot be deleted this way." if ($password and $$row{admin_post} eq 'yes');
-
+		
 		unless($fileonly)
 		{
 			# remove files from comment and possible replies
 			$sth=$dbh->prepare("SELECT image,thumbnail FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=?") or return(S_SQLFAIL);
 			$sth->execute($post,$post) or return S_SQLFAIL;
-
+			
 			while($res=$sth->fetchrow_hashref())
 			{
 				system($board->path.'/'.$board->option('LOAD_SENDER_SCRIPT')." $$res{image} &") if($board->option('ENABLE_LOAD'));
-	
+				
+				# Properties for PCH files corresponding to responses, if existent
+				my $res_pch = find_pch($$res{image});
+
 				if($archiving)
 				{
 					# archive images
 					rename $board->path.'/'.$$res{image}, $board->path.'/'.$board->option('ARCHIVE_DIR').$$res{image};
+					rename $board->path.'/'.$res_pch, $board->path.'/'.$board->option('ARCHIVE_DIR').$res_pch if (-e $board->path.'/'.$board->option('ARCHIVE_DIR').$res_pch);
 					rename $board->path.'/'.$$res{thumbnail}, $board->path.'/'.$board->option('ARCHIVE_DIR').$$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
 				}
 				else
 				{
 					# delete images if they exist
 					unlink $board->path.'/'.$$res{image};
+					unlink $board->path.'/'.$res_pch if (-e $board->path.'/'.$res_pch);
 					unlink $board->path.'/'.$$res{thumbnail} if($$res{thumbnail}=~/^$thumb/);
 				}
 			}
@@ -1775,10 +1823,13 @@ sub delete_post($$$$)
 		{
 			if($$row{image})
 			{
+				# Properties for PCH file, if existent
+				my $pch = find_pch($$row{image});
 				system($board->path.'/'.$board->option('LOAD_SENDER_SCRIPT')." $$row{image} &") if($board->option('ENABLE_LOAD'));
 
 				# remove images
 				unlink $board->path.'/'.$$row{image};
+				unlink $board->path.'/'.$pch if (-e $board->path.'/'.$pch);
 				unlink $board->path.'/'.$$row{thumbnail} if($$row{thumbnail}=~/^$thumb/);
 
 				$sth=$dbh->prepare("UPDATE `".$board->option('SQL_TABLE')."` SET size=0,md5=null,thumbnail=null WHERE num=?;") or return S_SQLFAIL;
@@ -2712,7 +2763,7 @@ sub do_rebuild_cache($;$)
 	build_thread_cache_all();
 	build_cache();
 
-	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT) unless $do_not_redirect;
+	make_http_forward(expand_filename($board->option('HTML_SELF'),1),ALTERNATE_REDIRECT) unless $do_not_redirect;
 }
 
 sub do_global_rebuild_cache($) # Rebuild all boards' caches
@@ -2739,7 +2790,7 @@ sub do_global_rebuild_cache($) # Rebuild all boards' caches
 	
 	$board = Board->new($current_board); # Return to the loop iteration's motherland
 	
-	make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+	make_http_forward(expand_filename($board->option('HTML_SELF'),1),ALTERNATE_REDIRECT);
 }
 
 sub add_admin_entry($$$$$$$$$)
@@ -3002,6 +3053,7 @@ sub add_htaccess_entry($)
 sub remove_htaccess_entry($)
 {
 	my $ip = $_[0];
+	$ip =~ s/\./\\\./g;
 	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") or warn "Error writing to .htaccess ";
 	my $file_contents = do { local $/; <HTACCESSREAD> };
         if ($file_contents =~ m/\n\# Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n/)
@@ -4270,9 +4322,10 @@ sub make_painter($$$$$$$$$)
 	
 	if ($oek_editing)
 	{
-		my $sth = $dbh->prepare("SELECT password FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
+		my $sth = $dbh->prepare("SELECT password, image FROM `".$board->option('SQL_TABLE')."` WHERE num=?;") or make_error(S_SQLFAIL);
 		$sth->execute($num) or make_error(S_SQLFAIL);
 		my $row=get_decoded_hashref($sth);
+		make_error("No image to edit!") if (!$$row{image});
 		make_error(S_BADEDITPASS) if ($password ne $$row{password});
 		make_error(S_NOPASS) if ($password eq '');
 		$sth->finish();
@@ -4290,13 +4343,25 @@ sub make_painter($$$$$$$$$)
 	
 		print "Content-Type: text/html; charset=Shift_JIS\n";
 		print "\n";
+		
+		my $oek_pch;
+		
+		if ($oek_src)
+		{
+			$oek_pch = find_pch($oek_src);
+			unless (-e $board->path().'/'.$oek_pch)
+			{
+				$oek_pch = '';
+			}
+		}
 	
 		print OEKAKI_PAINT_TEMPLATE->(
 			oek_painter=>clean_string($oek_painter),
 			oek_x=>clean_string($oek_x),
 			oek_y=>clean_string($oek_y),
 			oek_parent=>clean_string($oek_parent),
-			oek_src=>expand_filename(clean_string($oek_src)),
+			oek_src=>($oek_src) ? expand_filename(clean_string($oek_src)) : '',
+			oek_pch=>($oek_pch) ? expand_filename(clean_string($oek_pch)) : '',
 			ip=>$ip,
 			time=>$time,
 			mode=>$mode,
@@ -4326,6 +4391,7 @@ sub make_oekaki_finish($$$$$$$)
 	make_error('Invalid IP') unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
 	
 	my $tmpname=$board->option('TMP_DIR').$oek_ip.'.png';
+	my $pchname=$board->option('TMP_DIR').$oek_ip.'.pch';
 	
 	make_http_header();
 
@@ -4337,7 +4403,7 @@ sub make_oekaki_finish($$$$$$$)
 			oek_ip=>$oek_ip,
 			srcinfo=>clean_string($srcinfo),
 			dummy=>$dummy,
-			decodedinfo=>OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$board->path().'/'.$tmpname)),
+			decodedinfo=>OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname,$pchname)),
 			stylesheets=>get_stylesheets(),
 			board=>$board
 		);
@@ -4353,7 +4419,7 @@ sub make_oekaki_finish($$$$$$$)
 			oek_parent=>clean_string($oek_parent),
 			oek_ip=>$oek_ip,
 			srcinfo=>clean_string($srcinfo),
-			decodedinfo=>OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),
+			decodedinfo=>OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname,$pchname)),
 			num=>$num,
 			dummy => $dummy,
 			comment=>tag_killa($$row{comment}),
@@ -4380,22 +4446,58 @@ sub pretty_age($)
 	return "HAXORED";
 }
 
-sub decode_srcinfo($$)
+sub decode_srcinfo($$$)
 {
-	my ($srcinfo,$tmpname)=@_;
+	my ($srcinfo,$tmpname,$pch_name)=@_;	# Accepts just the filenames.
+	my $board_path = $board->path().'/';
 	my @info=split /,/,$srcinfo;
-	my @stat=stat $tmpname;
+	my @stat=stat $board_path.$tmpname;
 	my $fileage=$stat[9];
 	my $source = $info[2];
-	my $path = $board->path().'/';
-	$source =~ s/^\/?${path}//;
+	$source =~ s/^\/${board_path}//;
+	# Create absolute path for source and PCH file
+	$source = expand_filename($source) if ($source);
+	$pch_name = expand_filename($pch_name) if ($pch_name);
+	
 	my ($painter)=grep { $$_{painter} eq $info[1] } @{S_OEKPAINTERS()};
 
 	return (
 		time=>clean_string(pretty_age($fileage-$info[0])),
 		painter=>clean_string($$painter{name}),
 		source=>clean_string($source),
+		animation=>clean_string($pch_name),
 	);
+}
+
+sub copy_animation_file($$)
+{
+	my ($pch, $image_filename) = @_; 
+	binmode $pch;	# Read in binary mode.
+
+	# Copy
+	my $filename = find_pch($image_filename);
+	
+	# Perform file copy.
+	my $buffer;
+	open (OUTFILE,">>".$board->path().'/'.$filename) or make_error(S_NOTWRITE);
+	binmode OUTFILE;
+	while (read($pch,$buffer,1024)) # should the buffer be larger?
+	{
+		print OUTFILE $buffer;
+	}
+	close $pch;
+	close OUTFILE;
+	
+	chmod 0644, $filename;	# Make world-readable.
+	
+	return $filename;	# Return filename of the new pch file.
+}
+
+sub find_pch($)
+{
+	my $filename = $_[0];
+	$filename =~ s/\.[^\.]+$/.pch/;
+	return $filename;
 }
 
 #
@@ -4409,21 +4511,34 @@ while ( $query = new CGI::Fast )
 	$count++;
 	
 	# It may be nicer to put this outside the loop... but the database connection seems to expire and stay dead unless it is put in here.
-	$dbh=get_conn(); 
-
-	my $board_name=($query->param("board"));
-	if ((! -e './'.$board_name) || !$board_name || $board_name eq "include")
-	{
-		print ("Content-type: text/plain\n\nBoard not found.");
-		next;
-	}
-	if (! -e './'.$board_name.'/board_config.pl')
-	{
-		print ("Content-type: text/plain\n\nBoard configuration not found.");
-		next;
-	}
+	$dbh=get_conn();
 	
-	$board = Board->new($board_name);
+	my $task=($query->param("task") or $query->param("action"));
+	
+	unless ($task eq 'oekakianimation' || $task eq 'banreport')	# Unless working with a global task
+	{
+		my $board_name=($query->param("board"));
+		if ((! -e './'.$board_name) || !$board_name || $board_name eq "include")
+		{
+			print ("Content-type: text/plain\n\nBoard not found.");
+			next;
+		}
+		if (! -e './'.$board_name.'/board_config.pl')
+		{
+			print ("Content-type: text/plain\n\nBoard configuration not found.");
+			next;
+		}
+		
+		$board = Board->new($board_name);
+		
+		if(!table_exists($board->option('SQL_TABLE')) && table_exists(SQL_ACCOUNT_TABLE)) # check for comments table
+		{
+			init_database();
+			build_cache();
+			make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
+			abort_user_action();
+		}
+	}
 
 	# check for admin table
 	init_admin_database() if(!table_exists(SQL_ADMIN_TABLE));
@@ -4451,16 +4566,6 @@ while ( $query = new CGI::Fast )
 		print HTACCESSMAKE "RewriteEngine On\nOptions +FollowSymLinks +ExecCGI\n\n";
 		close HTACCESSMAKE;
 	}
-	
-	if(!table_exists($board->option('SQL_TABLE')) && table_exists(SQL_ACCOUNT_TABLE)) # check for comments table
-	{
-		init_database();
-		build_cache();
-		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT);
-		abort_user_action();
-	}
-	
-	my $task=($query->param("task") or $query->param("action"));
 	
 	# Check for and remove old bans
 	my $oldbans=$dbh->prepare("SELECT ival1, total FROM `".SQL_ADMIN_TABLE."` WHERE expiration <= ".time()." AND expiration <> 0 AND expiration IS NOT NULL;");
@@ -4512,7 +4617,7 @@ while ( $query = new CGI::Fast )
 		my $admin_post = $query->param("adminpost");
 		# (postfix removed--oekaki only)
 	
-		post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,'',$sticky,$lock,$admin_post);
+		post_stuff($parent,$name,$email,$subject,$comment,$file,$file,$password,$nofile,$captcha,$admin,$no_captcha,$no_format,0,'','',$sticky,$lock,$admin_post);
 	}
 	
 	# Management
@@ -4756,7 +4861,7 @@ while ( $query = new CGI::Fast )
 		my $password = $query->param("password");
 		my $killtrip = $query->param("killtrip");
 		my $admin_edit = $query->param("adminedit");
-		edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,$postfix,$killtrip,$admin_edit);
+		edit_shit($num,$name,$email,$subject,$comment,$file,$file,$password,$captcha,$admin,$no_captcha,$no_format,'','',$killtrip,$admin_edit);
 	}
 	elsif($task eq "edit")
 	{
@@ -4868,7 +4973,7 @@ while ( $query = new CGI::Fast )
 	}
 
 	# Oekaki Stuff
-	elsif ($task eq "paint")
+	elsif ($task eq "paint" && $board->option('ENABLE_OEKAKI'))
 	{
 		my $oek_painter=$query->param("oek_painter");
 		my $oek_x=$query->param("oek_x");
@@ -4881,7 +4986,7 @@ while ( $query = new CGI::Fast )
 		my $dummy=$query->param("dummy");
 		make_painter($oek_painter,$oek_x,$oek_y,$oek_parent,$oek_src,$oek_editing,$num,$password,$dummy);
 	}
-	elsif ($task eq "finishpaint")
+	elsif ($task eq "finishpaint" && $board->option('ENABLE_OEKAKI'))
 	{
 		my $num=$query->param("num");
 		my $dummy=$query->param("dummy");
@@ -4892,14 +4997,25 @@ while ( $query = new CGI::Fast )
 		my $oek_ip=$query->param("oek_ip");
 		make_oekaki_finish($num, $dummy, $oek_parent, $srcinfo, $oek_editing, $password, $oek_ip);
 	}
-	elsif ($task eq "oekakipost")
+	elsif ($task eq "oekakipost" && $board->option('ENABLE_OEKAKI'))
 	{
 		my $parent=$query->param("parent");
 		my $oek_ip=$query->param("oek_ip");
 		$oek_ip ||= $ENV{REMOTE_ADDR};
 		abort_user_action() unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
-		my $tmpname=($board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.png'); # Open up the oekaki the user has uploaded...
-		open (TMPFILE,$tmpname) or make_error("Can't read uploaded file");
+		my $tmpname=$oek_ip.'.png'; # Open up the oekaki the user has uploaded...
+		my $pchname=$oek_ip.'.pch'; # Open up the PCH animation file
+		open (TMPFILE,$board->path().'/'.$board->option('TMP_DIR').$tmpname) or make_error("Can't read uploaded file");	# Open file handle for oekaki upload
+		my ($pch,$pch_file_read_succeed);
+		if (open (PCHFILE, $board->path().'/'.$board->option('TMP_DIR').$pchname) && -s $board->path().'/'.$board->option('TMP_DIR').$pchname > 0)
+		{
+			$pch = \*PCHFILE;
+			$pch_file_read_succeed = 1;
+		}
+		else
+		{
+			$pch = '';
+		}
 		my $name=$query->param("field1");
 		my $email=$query->param("email");
 		my $subject=$query->param("subject");
@@ -4908,19 +5024,32 @@ while ( $query = new CGI::Fast )
 		my $captcha=$query->param("captcha");
 		my $srcinfo=$query->param("srcinfo");
 		
-		post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,0,$captcha,'',0,0,OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),0,0,0);
+		post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$board->option('TMP_DIR').$tmpname,$password,0,$captcha,'',0,0,1,$srcinfo,$pch,0,0,0);
 		
-		close TMPFILE;
-		unlink $tmpname;
+		# Close and delete the image and PCH files as necessary.
+		close TMPFILE and unlink $board->path().'/'.$board->option('TMP_DIR').$tmpname;
+		close PCHFILE if $pch_file_read_succeed;
+		unlink $board->path().'/'.$board->option('TMP_DIR').$pchname if (-e $board->path().'/'.$board->option('TMP_DIR').$pchname);
 	}
-	elsif ($task eq "oekakiedit")
+	elsif ($task eq "oekakiedit" && $board->option('ENABLE_OEKAKI'))
 	{
 		my $num=$query->param("num");
 		my $oek_ip=$query->param("oek_ip");
 		$oek_ip ||= $ENV{REMOTE_ADDR};
 		abort_user_action() unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
-		my $tmpname=$board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.png';
-		open TMPFILE,$tmpname or make_error("Can't read uploaded file");
+		my $tmpname=$board->option('TMP_DIR').$oek_ip.'.png';
+		open TMPFILE,$board->path().'/'.$tmpname or make_error("Can't read uploaded file");
+		my $pchfile = $board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.pch';	# PCH File--kept only if it is an edit of an Oekaki with animation
+		my ($pch,$pch_file_read_succeed);
+		if (open PCHFILE,"$pchfile")
+		{
+			$pch = \*PCHFILE;
+			$pch_file_read_succeed = 1;
+		}
+		else
+		{
+			$pch = '';
+		}
 		my $name=$query->param("field1");
 		my $email=$query->param("email");
 		my $subject=$query->param("subject");
@@ -4930,10 +5059,20 @@ while ( $query = new CGI::Fast )
 		my $srcinfo=$query->param("srcinfo");
 		my $killtrip=$query->param("killtrip");
 
-		edit_shit($num,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,$captcha,'',0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname)),$killtrip,0);
+		edit_shit($num,$name,$email,$subject,$comment,\*TMPFILE,$tmpname,$password,$captcha,'',0,0,OEKAKI_EDIT_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$tmpname,'')),$pch,$killtrip,0);
 
+		# Delete the temporary file along with the pch (if applicable).
 		close TMPFILE;
 		unlink $tmpname;
+		close PCHFILE if ($pch_file_read_succeed);
+		unlink $pchfile if (-e $pchfile);
+	}
+	elsif ($task eq "oekakianimation")
+	{
+		my $pch_file=$query->param("pchfile");
+		print "Content-Type: text/html; charset=Shift_JIS\n";
+		print "\n";
+		print OEKAKI_ANIMATION_TEMPLATE->(pch_file=>$pch_file);
 	}
 
 	# Post Reporting Subroutines

@@ -117,7 +117,7 @@ $config{CSS_DIR} = "css/";
 												#        * Set up two files, one being the official list from
 												#          http://wakaba.c3.cx/antispam/spam.txt, and one your own additions.
 # Oekaki Stuff
-$config{OEKAKI_BOARD} = 0;			# Enable Oekaki?
+$config{ENABLE_OEKAKI} = 0;			# Enable Oekaki?
 $config{TMP_DIR} = 'tmp/';						# Temp file directory (needs to be writeable by the script)
 
 $config{OEKAKI_ENABLE_MODIFY} = 1;				# Enable image modification

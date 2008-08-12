@@ -34,6 +34,7 @@ form .trap { display:none }
 .reply .filesize { margin-left: 20px }
 .userdelete { float: right; text-align: center; white-space: nowrap }
 .replypage .replylink { display: none }
+.oekinfo { font-size: small }
 .hidden { display: none }
 .inline { display: inline }
 </style>
@@ -71,7 +72,7 @@ use constant MINI_HEAD_INCLUDE => q{
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-<title><var $board-\>path()> - <var $$board-\>option('TITLE')></title>
+<title><var $board-\>path()> - <var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
@@ -2162,12 +2163,14 @@ table.nospace tr td { margin:0px; }
 <applet code="c.ShiPainter.class" name="paintbbs" archive="spainter_all.jar" width="100%" height="100%">
 <param name="image_width" value="<var $oek_x>" />
 <param name="image_height" value="<var $oek_y>" />
-<param name="image_canvas" value="<var $oek_src>" />
+<if $oek_src && !$oek_pch><param name="image_canvas" value="<var $oek_src>" /></if>
+<if $oek_pch><param name="pch_file" value="<var $oek_pch>" /></if>
 <param name="dir_resource" value="./" />
 <param name="tt.zip" value="tt_def.zip" />
 <param name="res.zip" value="res.zip" />
 <param name="tools" value="<var $mode>" />
 <param name="layer_count" value="3" />
+<param name="thumbnail_type" value="animation" />
 <param name="url_save" value="<var expand_filename($tmp_dir.'getpic.pl')>" />
 <param name="url_exit" value="<var $self>?task=finishpaint&amp;board=<var $board-\>path()>&amp;oek_parent=<var $oek_parent>&amp;oek_ip=<var $ip>&amp;<if $oek_editing>oek_editing=1&amp;password=<var $password>&amp;num=<var $num>&amp;</if>dummy=<var $dummy>&amp;srcinfo=<var $time>,<var $oek_painter>,<var $oek_src>" />
 <param name="send_header" value="<var $ip>" />
@@ -2183,17 +2186,47 @@ table.nospace tr td { margin:0px; }
 </html>
 });
 
+use constant OEKAKI_ANIMATION_TEMPLATE => compile_template(q{
+<html>
+<head>
+<style type="text/css">
+body { background: #9999BB; font-family: sans-serif; }
+input,textarea { background-color:#CFCFFF; font-size: small; }
+table.nospace { border-collapse:collapse; }
+table.nospace tr td { margin:0px; } 
+.menu { background-color:#CFCFFF; border: 1px solid #666666; padding: 2px; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<table class="nospace" width="100%" height="100%"><tbody><tr>
+<td width="100%">
+<applet name="pch" code="pch2.PCHViewer.class" codebase="./" archive="PCHViewer.jar" width="100%" height="100%">
+<param name="pch_file" value="<var $pch_file>" />
+<param name="tt.zip" value="tt_def.zip" />
+<param name="res.zip" value="res.zip" />
+<param name="speed" value="0" />
+<param name="buffer_canvas" value="true" />
+<param name="buffer_progress" value="true" />
+</applet>
+</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
+});
 
 use constant OEKAKI_INFO_TEMPLATE => compile_template(q{
-<p><small><strong>
-Oekaki post</strong> (Time: <var $time>, Painter: <var $painter><if $source>, Source: <a href="<var $source>"><var $source></a></if>)
-</small></p>
+<p class="oekinfo">
+	<strong>Oekaki Post</strong>
+	 (Time: <var $time>, Painter: <var $painter><if $source>, Source: <a href="<var $source>"><var $source></a></if><if $animation>, Animation: [<a href="<var $self>?task=oekakianimation&amp;pchfile=<var $animation>" target="_blank">View</a>]</if>)
+</p>
 });
 
 use constant OEKAKI_EDIT_INFO_TEMPLATE => compile_template(q{
-<p><small><strong>
+<p class="oekinfo"><strong>
 Edited in Oekaki</strong> (Time: <var $time>, Painter: <var $painter>)
-</small></p>
+</p>
 });
 
 use constant OEKAKI_FINISH_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
