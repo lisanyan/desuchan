@@ -854,7 +854,7 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 			if (-e $board->path().'/'.$original_pch)
 			{
 				unlink './'.$board->path().'/'.$original_pch;
-				$replace_pch = 1 if $pch;
+				$replace_pch=1;
 			}
 		}
 		else
@@ -884,7 +884,7 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
-	if($file)
+	if($file && $replace_pch)
 	{
 		# now delete original files
 		if ($$row{image} ne '') { unlink $board->path().'/'.$$row{image}; }
@@ -897,14 +897,14 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 			or make_error(S_SQLFAIL,1);
 		$filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$size, $num) or make_error(S_SQLFAIL);
 	
-		if ($replace_pch)
+		if ($pch)
 		{
 			my $new_pch = copy_animation_file($pch,$filename);
-			$comment =~ s/\Q$original_pch\E/${new_pch}/g;
+			$comment =~ s/$original_pch/${new_pch}/g;
 		}
 		else
 		{
-			$comment =~ s/,\s*Animation:\s*\[<a href=.*?View<\/a>.*\)\s*<\/p>//;	# *shouldn't* happen
+			$comment =~ s/,\s*Animation:\s*\[<a href=.*?View<\/a>[^\)]*//;	# *shouldn't* happen in Oekaki
 		}
 	}
 	
@@ -4488,7 +4488,7 @@ sub copy_animation_file($$)
 	close $pch;
 	close OUTFILE;
 	
-	chmod 0644, $filename;	# Make world-readable.
+	chmod 0644, $board->path().'/'.$filename;	# Make world-readable.
 	
 	return $filename;	# Return filename of the new pch file.
 }
@@ -5007,7 +5007,7 @@ while ( $query = new CGI::Fast )
 		my $pchname=$oek_ip.'.pch'; # Open up the PCH animation file
 		open (TMPFILE,$board->path().'/'.$board->option('TMP_DIR').$tmpname) or make_error("Can't read uploaded file");	# Open file handle for oekaki upload
 		my ($pch,$pch_file_read_succeed);
-		if (open (PCHFILE, $board->path().'/'.$board->option('TMP_DIR').$pchname) && -s $board->path().'/'.$board->option('TMP_DIR').$pchname > 0)
+		if (open (PCHFILE, $board->path().'/'.$board->option('TMP_DIR').$pchname) && -s $board->path().'/'.$board->option('TMP_DIR').$pchname > 0 && -s $board->path().'/'.$board->option('TMP_DIR').$pchname < 80000000)
 		{
 			$pch = \*PCHFILE;
 			$pch_file_read_succeed = 1;
@@ -5027,7 +5027,8 @@ while ( $query = new CGI::Fast )
 		post_stuff($parent,$name,$email,$subject,$comment,\*TMPFILE,$board->option('TMP_DIR').$tmpname,$password,0,$captcha,'',0,0,1,$srcinfo,$pch,0,0,0);
 		
 		# Close and delete the image and PCH files as necessary.
-		close TMPFILE and unlink $board->path().'/'.$board->option('TMP_DIR').$tmpname;
+		close TMPFILE;
+		unlink $board->path().'/'.$board->option('TMP_DIR').$tmpname;
 		close PCHFILE if $pch_file_read_succeed;
 		unlink $board->path().'/'.$board->option('TMP_DIR').$pchname if (-e $board->path().'/'.$board->option('TMP_DIR').$pchname);
 	}
@@ -5039,9 +5040,9 @@ while ( $query = new CGI::Fast )
 		abort_user_action() unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
 		my $tmpname=$board->option('TMP_DIR').$oek_ip.'.png';
 		open TMPFILE,$board->path().'/'.$tmpname or make_error("Can't read uploaded file");
-		my $pchfile = $board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.pch';	# PCH File--kept only if it is an edit of an Oekaki with animation
+		my $pchfile = './'.$board->path().'/'.$board->option('TMP_DIR').$oek_ip.'.pch';	# PCH File--kept only if it is an edit of an Oekaki with animation
 		my ($pch,$pch_file_read_succeed);
-		if (open PCHFILE,"$pchfile")
+		if (open(PCHFILE,$pchfile) && -s "$pchfile" && -s "$pchfile" < 80000000)
 		{
 			$pch = \*PCHFILE;
 			$pch_file_read_succeed = 1;
@@ -5050,6 +5051,7 @@ while ( $query = new CGI::Fast )
 		{
 			$pch = '';
 		}
+		
 		my $name=$query->param("field1");
 		my $email=$query->param("email");
 		my $subject=$query->param("subject");

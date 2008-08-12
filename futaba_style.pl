@@ -2189,6 +2189,7 @@ table.nospace tr td { margin:0px; }
 use constant OEKAKI_ANIMATION_TEMPLATE => compile_template(q{
 <html>
 <head>
+<title>Oekaki Animation</title>
 <style type="text/css">
 body { background: #9999BB; font-family: sans-serif; }
 input,textarea { background-color:#CFCFFF; font-size: small; }

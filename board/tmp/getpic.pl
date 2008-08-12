@@ -10,7 +10,7 @@ my $metadata=<STDIN>;
 my ($oek_ip, $image_length);
 
 # Grab Oekaki IP and Image Length
-if ($metadata=~/^S[0-9]{8}(.*)([0-9]{8})$/)
+if ($metadata=~/^S[0-9]{8}(.*)([0-9]{8})\n?/)
 {
 	$oek_ip = $1;
 	$image_length = $2;
@@ -23,6 +23,8 @@ else
 # Sanity check
 die unless($oek_ip=~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
 
+my $buffer = do { local $/; <STDIN> };
+
 my $tmpname_o=$oek_ip.'.png';
 my $tmpname_anim=$oek_ip.'.pch';
 
@@ -33,7 +35,6 @@ binmode IMGFILE;
 binmode ANIMFILE;
 binmode STDIN;
 
-my $buffer = do { local $/; <STDIN> };
 
 # Grab Image Data
 my $image_data = substr($buffer, 0, $image_length);
