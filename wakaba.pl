@@ -177,6 +177,8 @@ sub build_cache_page($$@)
 		my $images=grep { $$_{image} } @replies;
 		my $curr_replies=$replies;
 		my $curr_images=$images;
+		
+		# Abbreviation setings -- Stickied threads have their own setting
 		my $max_replies=$board->option('REPLIES_PER_THREAD');
 		my $max_images=($board->option('IMAGE_REPLIES_PER_THREAD') or $images);
 
@@ -367,7 +369,7 @@ sub post_stuff($$$$$$$$$$$$$$$$$$$)
 		else
 		{
 			make_error(S_NOTALLOWED) if($file and !($board->option('ALLOW_IMAGES')));
-			make_error(S_NOTALLOWED) if(!$file and !($board->option('ALLOW_TEXTONLY')));
+			make_error(S_NOTALLOWED) if(!$file and $nofile and !($board->option('ALLOW_TEXTONLY')));
 		}
 	}
 	
@@ -514,7 +516,13 @@ sub post_stuff($$$$$$$$$$$$$$$$$$$)
 	if ($oekaki_post && $board->option('ENABLE_OEKAKI'))
 	{
 		my $new_pch_filename = '';
-		$new_pch_filename = copy_animation_file($pch,$filename) if ($pch);	# If applicable, copy PCH file with the same filename base as the file we just copied.
+		my (@srcinfo_array, $source_file, $source_pch);
+		# Check to see, if it is a modification of a source, if the source has an animation file.
+		@srcinfo_array = split /,/,$srcinfo;
+		$source_file = $srcinfo_array[2] if ($srcinfo_array[2]);
+		$source_file =~ s/^\/// if ($source_file);
+		my $source_pch = find_pch($source_file) if $source_file;
+		$new_pch_filename = copy_animation_file($pch,$filename) if ($pch && (!$source_file || -e "$source_pch"));	# If applicable, copy PCH file with the same filename base as the file we just copied.
 		my $postfix = OEKAKI_INFO_TEMPLATE->(decode_srcinfo($srcinfo,$uploadname,$new_pch_filename));
 
 		# Attach Oekaki Postfix
@@ -742,7 +750,7 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 		}
 		else
 		{
-			make_error(S_NOTALLOWED,1) if($file and !$board->option('ALLOW_IMAGES'));
+			make_error(S_NOTALLOWED,1) if($file and !($board->option('ALLOW_IMAGES')));
 		}
 		
 		# Only staff can change management posts and edits
@@ -884,12 +892,12 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 	# generate ID code if enabled
 	$date.=' ID:'.make_id_code($ip,$time,$email) if($board->option('DISPLAY_ID'));
 
-	if($file && $replace_pch)
+	if($file)
 	{
 		# now delete original files
 		if ($$row{image} ne '') { unlink $board->path().'/'.$$row{image}; }
-		my $thumb=$board->path.'/'.$board->option('THUMB_DIR');
-		if ($$row{thumbnail} =~ /^$thumb/) { unlink $$row{thumbnail}; }
+		my $thumb=$board->option('THUMB_DIR');
+		if ($$row{thumbnail} =~ /^$thumb/) { unlink $board->path().'/'.$$row{thumbnail}; }
 		
 		# copy file, do checksums, make thumbnail, etc
 		my ($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height)=process_file($file,$uploadname,$time,$$row{parent});
@@ -897,14 +905,14 @@ sub edit_shit($$$$$$$$$$$$$$$$) # ADDED subroutine for post editing
 			or make_error(S_SQLFAIL,1);
 		$filesth->execute($filename,$md5,$width,$height,$thumbnail,$tn_width,$tn_height,$size, $num) or make_error(S_SQLFAIL);
 	
-		if ($pch)
+		if ($replace_pch)
 		{
 			my $new_pch = copy_animation_file($pch,$filename);
 			$comment =~ s/$original_pch/${new_pch}/g;
 		}
 		else
 		{
-			$comment =~ s/,\s*Animation:\s*\[<a href=.*?View<\/a>[^\)]*//;	# *shouldn't* happen in Oekaki
+			$comment =~ s/,\s*Animation:\s*\[<a href=.*?View<\/a>[^\)]*// if ($comment =~ m/,\s*Animation:\s*\[<a href=.*?View<\/a>[^\)]*/);	# *shouldn't* happen in Oekaki
 		}
 	}
 	
@@ -1378,17 +1386,47 @@ sub format_comment($)
 	my ($comment)=@_;
 
 	# hide >>1 references from the quoting code
+	$comment =~ s/&gt;&gt;&gt;\/([0-9a-zA-Z]+)\/&gt;&gt;([0-9]+)/&gt&gt&gt;\/$1\/&gt&gt;$2/g;
+	$comment =~ s/&gt;&gt;&gt;\/([0-9a-zA-Z]+)\//&gt&gt&gt;\/$1\//g;
 	$comment=~s/&gt;&gt;([0-9\-]+)/&gtgt;$1/g;
 
 	my $handler=sub # fix up >>1 references
 	{
 		my $line=shift;
 
+		$line=~s!&gt&gt&gt;\/?([0-9a-zA-Z]+)\/?&gt&gt;([0-9]+)!
+			my $current_board_name = $board->path(); 
+			my $res;
+			undef $board;
+			$board = Board->new($1); # Switch from current board to mentioned board.
+			$res=get_post($2) if ($board->option('SQL_TABLE'));
+			my $return_string;
+			if($res) { $return_string = '<a href="'.get_reply_link($$res{num},$$res{parent}).'" onclick="highlight('.$1.')">&gt;&gt;&gt;/'.$1.'/&gt;&gt;'.$2.'</a>' }
+			else { $return_string = "&gt;&gt;&gt;/$1/&gt;&gt;$2"; }
+			undef $board;
+			$board = Board->new($current_board_name);
+			$return_string;
+		!ge;
+		
+		$line=~s!&gt&gt&gt;\/?([0-9a-zA-Z]+)\/?!
+			my $current_board_name = $board->path(); 
+			my $res;
+			undef $board;
+			$board = Board->new($1); # Switch from current board to mentioned board.
+			$res=1 if ($board->option('SQL_TABLE'));
+			my $return_string;
+			if($res) { $return_string = '<a href="'.expand_filename($board->option('HTML_SELF')).'">&gt;&gt;&gt;/'.$1.'/</a>' }
+			else { $return_string = "&gt;&gt;&gt;/$1/"; }
+			undef $board;
+			$board = Board->new($current_board_name);
+			$return_string;
+		!ge;		
+
 		$line=~s!&gtgt;([0-9]+)!
 			my $res=get_post($1);
 			if($res) { '<a href="'.get_reply_link($$res{num},$$res{parent}).'" onclick="highlight('.$1.')">&gt;&gt;'.$1.'</a>' }
 			else { "&gt;&gt;$1"; }
-		!ge;			
+		!ge;
 
 		return $line;
 	};
@@ -1552,6 +1590,9 @@ sub process_file($$$$)
 
 	make_error(S_BADFORMAT) unless($board->option('ALLOW_UNKNOWN') or $known);
 	make_error(S_BADFORMAT) if(grep { $_ eq $ext } $board->option('FORBIDDEN_EXTENSIONS'));
+	# Check file type with UNIX utility file()
+	my $file_response = system("file",$file);
+	make_error(S_BADFORMAT) if $file_response =~ /\:.*(?:script|text)/;
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_WIDTH') and $width>($board->option('MAX_IMAGE_WIDTH')));
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_HEIGHT') and $height>($board->option('MAX_IMAGE_HEIGHT')));
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_PIXELS') and $width*$height>($board->option('MAX_IMAGE_PIXELS')));
@@ -1572,7 +1613,7 @@ sub process_file($$$$)
 	# copy file
 	open (OUTFILE,">>$filename") or make_error(S_NOTWRITE);
 	binmode OUTFILE;
-	while (read($file,$buffer,1024)) # should the buffer be larger?
+	while (read($file,$buffer,2048)) # should the buffer be larger?
 	{
 		print OUTFILE $buffer;
 		$md5ctx->add($buffer) if($md5ctx);
@@ -2145,7 +2186,7 @@ sub make_admin_ban_edit($$) # generating ban editing window
 		if ($$row{expiration} != 0)
 		{
 			@utctime = gmtime($$row{expiration}); #($sec, $min, $hour, $day,$month,$year)
-		} 
+		}
 		else
 		{
 			@utctime = gmtime(time);
@@ -2428,7 +2469,7 @@ sub make_staff_activity_panel($$$$$$$$$$)
 	}
 	elsif ($view eq 'post')
 	{
-		$post_to_view = $board->path().','.$post_to_view if $post_to_view !~ /,/;
+		$post_to_view = $board->path().','.$post_to_view if (index($post_to_view,',') == -1);
 		
 		my $count_get = $dbh->prepare("SELECT COUNT(*) FROM `".SQL_STAFFLOG_TABLE."` WHERE info LIKE ?;");
 		$count_get->execute('%'.$post_to_view.'%') or make_error(S_SQLFAIL);
@@ -3423,6 +3464,7 @@ sub expand_image_filename($)
 	my $filename=shift;
 
 	return expand_filename(clean_path($filename)) unless $board->option('ENABLE_LOAD');
+	
 
 	my ($self_path)=$ENV{SCRIPT_NAME}=~m!^(.*/)[^/]+$!;
 	my $src=$board->option('IMG_DIR');

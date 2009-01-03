@@ -421,8 +421,8 @@ sub urlenc($)
 
 sub clean_path($)
 {
-	my ($str)=@_;
-	$str=~s!([^\w/._\-])!"%".sprintf("%02x",ord $1)!sge;
+	my $str=encode('utf8', shift);
+	$str=~s!([^a-zA-Z0-9/._\-])!"%".sprintf("%02X",ord $1)!sge;
 	return $str;
 }
 
