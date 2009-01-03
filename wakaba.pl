@@ -1620,7 +1620,11 @@ sub process_file($$$$)
 	
 	# Check file type with UNIX utility file()
 	my $file_response = system("file",$filename);
-	make_error(S_BADFORMAT) if $file_response =~ /\:.*(?:script|text)/;
+	if ($file_response =~ /\:.*(?:script|text)/)
+	{
+		unlink $filename;
+		make_error(S_BADFORMAT);
+	}
 
 	if($md5ctx) # if we have Digest::MD5, get the checksum
 	{
