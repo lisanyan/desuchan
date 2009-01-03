@@ -1590,9 +1590,6 @@ sub process_file($$$$)
 
 	make_error(S_BADFORMAT) unless($board->option('ALLOW_UNKNOWN') or $known);
 	make_error(S_BADFORMAT) if(grep { $_ eq $ext } $board->option('FORBIDDEN_EXTENSIONS'));
-	# Check file type with UNIX utility file()
-	my $file_response = system("file",$file);
-	make_error(S_BADFORMAT) if $file_response =~ /\:.*(?:script|text)/;
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_WIDTH') and $width>($board->option('MAX_IMAGE_WIDTH')));
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_HEIGHT') and $height>($board->option('MAX_IMAGE_HEIGHT')));
 	make_error(S_TOOBIG) if($board->option('MAX_IMAGE_PIXELS') and $width*$height>($board->option('MAX_IMAGE_PIXELS')));
@@ -1602,7 +1599,7 @@ sub process_file($$$$)
 	my $filename=$board->path.'/'.$board->option('IMG_DIR').$filebase.'.'.$ext;
 	my $thumbnail=$board->path.'/'.$board->option('THUMB_DIR').$filebase."s.jpg";
 	$filename.=$board->option('MUNGE_UNKNOWN') unless($known);
-
+	
 	# do copying and MD5 checksum
 	my ($md5,$md5ctx,$buffer);
 
@@ -1620,6 +1617,10 @@ sub process_file($$$$)
 	}
 	close $file;
 	close OUTFILE;
+	
+	# Check file type with UNIX utility file()
+	my $file_response = system("file",$filename);
+	make_error(S_BADFORMAT) if $file_response =~ /\:.*(?:script|text)/;
 
 	if($md5ctx) # if we have Digest::MD5, get the checksum
 	{
