@@ -320,8 +320,8 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
 			<var $date></label>
 			<span class="reflink">
-			<if !$thread><a href="<var get_reply_link($num,0)>#i<var $num>">No.<var $num></a></if>
-			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
+			<if !$thread><a href="<var get_reply_link($num,0)>#<var $num>">No.</a><a href="<var get_reply_link($num,0)>#i<var $num>"><var $num></a></if>
+			<if $thread><a href="#<var $num>">No.</a><a href="javascript:insert('&gt;&gt;<var $num>')"><var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
 				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>&amp;board=<var $board-\>path()>" target="_blank" onclick="passfield('<var $num>',false); return false">Delete</a>]
@@ -367,8 +367,8 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if !$email><span class="commentpostername"><var $name></span><if $trip><span class="postertrip"><var $trip></span></if></if>
 			<var $date></label>
 			<span class="reflink">
-			<if !$thread><a href="<var get_reply_link($parent,0)>#i<var $num>">No.<var $num></a></if>
-			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
+			<if !$thread><a href="<var get_reply_link($num,0)>#<var $num>">No.</a><a href="<var get_reply_link($parent,0)>#i<var $num>"><var $num></a></if>
+			<if $thread><a href="#<var $num>">No.</a><a href="javascript:insert('&gt;&gt;<var $num>')"><var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
 				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>&amp;board=<var $board-\>path>" target="_blank" onclick="passfield('<var $num>', false); return false">Delete</a>]
@@ -917,8 +917,8 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 			<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
 			<var $date></label>
 			<span class="reflink">
-			<if !$thread><a href="<var get_reply_link($num,0)>#i<var $num>">No.<var $num></a></if>
-			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
+			<if !$thread><a href="<var get_reply_link($num,0)>#<var $num>">No.</a><a href="<var get_reply_link($num,0)>#i<var $num>"><var $num></a></if>
+			<if $thread><a href="#<var $num>">No.</a><a href="javascript:insert('&gt;&gt;<var $num>')"><var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
 				[<a href="<var $self>?task=delpostwindow&amp;num=<var $num>" target="_blank" onclick="passfield('<var $num>',true); return false">Delete</a>
@@ -958,8 +958,8 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 			<span class="ipaddr">(IP: <var dec_to_dot($ip)><if $admin_post eq 'yes'>; <if !$lastedit><strong>Moderator Post</strong></if><if $lastedit><strong>Moderator Edit</strong></if></if>)</span> 
 			<var $date></label>
 			<span class="reflink">
-			<if !$thread><a href="<var get_reply_link($parent,0)>#i<var $num>">No.<var $num></a></if>
-			<if $thread><a href="javascript:insert('&gt;&gt;<var $num>')">No.<var $num></a></if>
+			<if !$thread><a href="<var get_reply_link($num,0)>#<var $num>">No.</a><a href="<var get_reply_link($parent,0)>#i<var $num>"><var $num></a></if>
+			<if $thread><a href="#<var $num>">No.</a><a href="javascript:insert('&gt;&gt;<var $num>')"><var $num></a></if>
 			</span>&nbsp;
 			<span class="deletelink" id="deletelink<var $num>">
 				[<a href="#" target="_blank" onclick="passfield('<var $num>',true); return false">Delete</a>
