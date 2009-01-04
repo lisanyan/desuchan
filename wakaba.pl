@@ -1619,7 +1619,7 @@ sub process_file($$$$)
 	close OUTFILE;
 	
 	# Check file type with UNIX utility file()
-	my $file_response = system("file",$filename);
+	my $file_response = `file $filename`;
 	if ($file_response =~ /\:.*(?:script|text)/)
 	{
 		unlink $filename;
