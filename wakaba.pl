@@ -61,25 +61,30 @@ sub make_error($;$$)
 	my $response = (!$fromwindow) ? encode_string(ERROR_TEMPLATE->(error=>$error,stylesheets=>get_stylesheets(),board=>$board)) : encode_string(ERROR_TEMPLATE_MINI->(error=>$error,stylesheets=>get_stylesheets(),board=>$board));
 	print $response;
 
-	if(ERRORLOG) # could print even more data, really.
-	{
-		if (ERRORLOG eq 'stderr')
-		{
-			warn "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{HTTP_REMOTE_ADDR}.", ".$board->path().": ".$error."\n";
-		}
-		else
-		{
-			open ERRORFILE,'>>'.ERRORLOG;
-			print ERRORFILE "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{HTTP_REMOTE_ADDR}.", ".$board->path().": ".$error."\n";
-			close ERRORFILE;
-		}
-	}
+	log_issue($error);
 
 	# delete temp files
 
 	$handling_request=0;
 	last if $count > $maximum_allowed_loops;
 	next; # Cancel current action that called me; go to the start of the FastCGI loop.
+}
+
+sub log_issue($)
+{
+	if(ERRORLOG) # could print even more data, really.
+	{
+		if (ERRORLOG eq 'stderr')
+		{
+			warn "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{REMOTE_ADDR}.", ".$board->path().": ".shift(@_)."\n";
+		}
+		else
+		{
+			open ERRORFILE,'>>'.ERRORLOG;
+			print ERRORFILE "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{REMOTE_ADDR}.", ".$board->path().": ".shift(@_)."\n";
+			close ERRORFILE;
+		}
+	}
 }
 
 #
@@ -1190,14 +1195,7 @@ sub host_is_banned($) # subroutine for handling bans
 	
 	$sth->finish();
 
-	if(ERRORLOG)
-	{
-		open ERRORFILE,'>>'.ERRORLOG;
-		print ERRORFILE S_BADHOST."\n";
-		print ERRORFILE $ENV{HTTP_USER_AGENT}."\n";
-		print ERRORFILE "**\n";
-		close ERRORFILE;
-	}
+	log_issue(S_BADHOST);
 
 	# delete temp files
 
@@ -2754,7 +2752,7 @@ sub do_login($$$$$)
 		
 		make_http_forward(get_secure_script_name()."?task=$nexttask&board=".$board->path(),ALTERNATE_REDIRECT);
 	}
-	else { make_admin_login($nexttask); }
+	else { log_issue(S_WRONGPASS); make_admin_login($nexttask); }
 }
 
 sub do_logout()
