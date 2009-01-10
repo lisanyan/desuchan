@@ -63,11 +63,16 @@ sub make_error($;$$)
 
 	if(ERRORLOG) # could print even more data, really.
 	{
-		open ERRORFILE,'>>'.ERRORLOG;
-		print ERRORFILE $error."\n";
-		print ERRORFILE $ENV{HTTP_USER_AGENT}."\n";
-		print ERRORFILE "**\n";
-		close ERRORFILE;
+		if (ERRORLOG eq 'stderr')
+		{
+			warn "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{HTTP_REMOTE_ADDR}.", ".$board->path().": ".$error."\n";
+		}
+		else
+		{
+			open ERRORFILE,'>>'.ERRORLOG;
+			print ERRORFILE "Wakaba: ".$ENV{HTTP_USER_AGENT}.", ".$ENV{HTTP_REMOTE_ADDR}.", ".$board->path().": ".$error."\n";
+			close ERRORFILE;
+		}
 	}
 
 	# delete temp files
@@ -358,7 +363,10 @@ sub post_stuff($$$$$$$$$$$$$$$$$$$)
 	else
 	{
 		# forbid admin-only features
-		make_error(S_WRONGPASS) if($no_captcha or $no_format or ($sticky && !$parent) or $lock);
+		if($no_captcha or $no_format or ($sticky && !$parent) or $lock)
+		{
+			make_error(S_WRONGPASS);
+		}
 
 		# check what kind of posting is allowed
 		if($parent)
@@ -1623,7 +1631,7 @@ sub process_file($$$$)
 	if ($file_response =~ /\:.*(?:script|text)/)
 	{
 		unlink $filename;
-		make_error(S_BADFORMAT);
+		make_error(S_BADFORMAT." Potential Exploit");
 	}
 
 	if($md5ctx) # if we have Digest::MD5, get the checksum
@@ -1930,6 +1938,20 @@ sub delete_post($$$$)
 	$sth->finish();
 	
 	return $postinfo;
+}
+
+#
+# Restoration
+#
+
+sub backup_post()
+{
+	
+}
+
+sub restore_post()
+{
+	
 }
 
 #
@@ -2761,8 +2783,10 @@ sub check_password($$;$)
 	my $path = $board->path(); # lol
 	make_error("Sorry, you do not have access rights to this board.<br />(Accessible: ".$$row{reign}.")<br /><a href=\"".get_script_name()."?task=logout&amp;board=".$board->path()."\">Logout</a>") if ($$row{account} eq 'mod' && $$row{reign} !~ /\b$path\b/); 
 	make_error("This account is disabled.") if ($$row{disabled});
-	make_error(S_WRONGPASS,$editing) if ($$row{username} ne $adminarray[0] || !$adminarray[0]); # This is necessary, in fact, to ensure case-sensitivity for the username
-	
+	if ($$row{username} ne $adminarray[0] || !$adminarray[0]) # This is necessary, in fact, to ensure case-sensitivity for the username
+	{
+		make_error(S_WRONGPASS,$editing);
+	}
 	my $encrypted_pass = crypt_password($$row{password});
 	$adminarray[1] =~ s/ /+/g; # Undoing encoding done in cookies. (+ is part of the base64 set)
 	
@@ -3138,6 +3162,8 @@ sub manage_staff($)
 		$latestaction->execute($$row{username});
 		
 		my $actionrow=$latestaction->fetchrow_hashref();
+		
+		# Copy action info into grabbed row.
 		$$row{action} = $$actionrow{action};
 		$$row{actiondate} = $$actionrow{date};
 		
