@@ -2923,6 +2923,7 @@ sub edit_admin_entry($$$$$$$$$$$$$$$) # subroutine for editing entries in the ad
 	my $row = get_decoded_hashref($verify);
 	make_error("Entry has not created or was removed.") if !$row;
 	make_error("Cannot change entry type.") if $type ne $$row{type};
+	make_error("Banning the entire Internet is a somewhat extreme measure.") if (!$ival2);
 	
 	# Do we need to make changes to .htaccess?
 	$not_total_before = 1 if ($$row{total} ne 'yes' && $type eq 'ipban');
