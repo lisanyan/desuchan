@@ -1196,7 +1196,7 @@ use constant STAFF_MANAGEMENT => compile_template(MANAGER_HEAD_INCLUDE.q{
 			<if $account eq 'globmod'>Global Moderator</if></td>
 			<td><if $account ne 'mod'><em>All</em></if><if $account eq 'mod'><var $reign></if></td>
 			<td><if $action><var get_action_name($action)> on <var $actiondate> [<a href="<var $self>?task=stafflog&amp;board=<var $board-\>path()>&amp;view=user&amp;usertoview=<var $username>">View All</a>]</if><if !$action><em>None</em></if></td>
-			<td>[<a href="<var $self>?task=edituserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Edit</a>] [<if $disabled><a href="">Enable</a></if><if !$disabled><a href="<var $self>?task=disableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Disable</a></if>] [<a href="<var $self>?task=deleteuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Remove</a>]</td>
+			<td>[<a href="<var $self>?task=edituserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Edit</a>] [<if $disabled><a href="<var $self>?task=enableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Enable</a></if><if !$disabled><a href="<var $self>?task=disableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Disable</a></if>] [<a href="<var $self>?task=deleteuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Remove</a>]</td>
 		</tr>
 	</loop>
 	</tbody>
