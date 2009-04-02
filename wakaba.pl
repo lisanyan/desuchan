@@ -2030,7 +2030,7 @@ sub make_admin_post_panel($$)
 		{                                  
 			my @thread = ($row);
 			my $threadnumber = $$row{num};
-			
+
 			# Grab thread replies
 			my $postcountquery=$dbh->prepare("SELECT COUNT(*) AS count, COUNT(image) AS imgcount FROM `".$board->option('SQL_TABLE')."` WHERE parent=?") or make_error(S_SQLFAIL);
 			$postcountquery->execute($threadnumber) or make_error(S_SQLFAIL);
@@ -2040,11 +2040,11 @@ sub make_admin_post_panel($$)
 			$postcountquery->finish();
 			
 			# Grab limits for SQL query
-			my $offset = ($postcount > $board->option('REPLIES_PER_THREAD')) ? $postcount - ($board->option('IMAGES_PER_PAGE')) : 0;
+			my $offset = ($postcount > $board->option('REPLIES_PER_THREAD')) ? $postcount - ($board->option('REPLIES_PER_THREAD')) : 0;
 			my $limit = $board->option('REPLIES_PER_THREAD');
 			my $shownimages = 0;
 			
-			my $threadquery=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=? ORDER BY stickied DESC, lasthit DESC, `".$board->option('SQL_TABLE')."`.num ASC LIMIT $limit OFFSET $offset;") or make_error(S_SQLFAIL);
+			my $threadquery=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE parent=? ORDER BY stickied DESC, lasthit DESC, num ASC LIMIT $limit OFFSET $offset") or make_error(S_SQLFAIL);
 			$threadquery->execute($threadnumber) or make_error(S_SQLFAIL);
 			while (my $inner_row=get_decoded_hashref($threadquery))
 			{
