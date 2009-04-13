@@ -143,7 +143,7 @@ use constant S_BAN_WHY => 'You or another user of this IP or IP range was banned
 use constant S_BAN_MISSING_REASON => 'No reason given. You should try refreshing this page, or you may need to speak with staff as this may be in error.';	# Appears if no Reason for the Ban is on Record
 use constant S_BAN_APPEAL_HEADER => 'How to Appeal';							# Header for appealing instructions
 # Instructions on Appealing. Feel free to customize.
-use constant S_BAN_APPEAL => 'To appeal your ban, please visit <a href="http://www.desuchan.net/sugg/">the suggestions board</a>.<br /> Abusing this may result in permanent banishment from Desuchan\'s services.'; 
+use constant S_BAN_APPEAL => 'To appeal your ban, please visit <a href="http://desuchan.net/sugg/">the suggestions board</a>.<br /> Abusing this may result in permanent banishment from Desuchan\'s services.'; 
 use constant S_BAN_NO_APPEAL => 'You may not appeal this ban.';						# Appears on banned IP page if no appealing is allowed. (NOT USED. KEPT IN CASE OF A REQUEST.)
 use constant S_BANEXPIRE => 'Length of Ban, in Seconds<br />(Use 0 if permanent.)';			# Option in Ban Panel for adjusting ban length
 use constant S_TOTALBAN => 'Ban from Browsing?';							# Option in Ban Panel for setting a ban prohibiting browsing content.
