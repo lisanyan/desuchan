@@ -164,7 +164,7 @@ function highlight(post)
 
 function set_stylesheet(styletitle,norefresh)
 {
-	set_cookie("wakabastyle",styletitle,365);
+	set_cookie("wakastyle",styletitle,365);
 
 	var links=document.getElementsByTagName("link");
 	var found=false;
