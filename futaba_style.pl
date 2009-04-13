@@ -9,15 +9,13 @@ BEGIN { require "wakautils.pl" }
 #
 
 use constant NORMAL_HEAD_INCLUDE => q{
-
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
 <head>
-<meta http-equiv="expires" content="Wed, 03 Nov 1999 12:21:14 GMT" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Cache-Control" content="no-cache" />
 <title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
@@ -69,11 +67,13 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
 <head>
-<title><var $board-\>path()> - <var $board-\>option('TITLE')></title>
+<title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
@@ -103,11 +103,13 @@ use constant MINI_HEAD_INCLUDE => q{
 };
 
 use constant MINI_HEAD_REFRESH_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
 <head>
 <title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
