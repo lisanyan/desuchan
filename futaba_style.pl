@@ -839,7 +839,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <if !$thread><tr><td class="postblock"><const S_PARENT></td><td><input type="text" name="parent" size="8" /></td></tr></if>
 <tr><td class="postblock">Posting Mode</td>
 <td>
-	<label><input type="radio" name="no_format" value="0" selected="selected" /><strong> User Friendly:</strong> Posts will be formatted with board settings.</label>
+	<label><input type="radio" name="no_format" value="0" checked="checked" /><strong> User Friendly:</strong> Posts will be formatted with board settings.</label>
 	<br />
 	<label><input type="radio" name="no_format" value="1" /><strong> Advanced:</strong> <const S_NOTAGS></label>
 </td>
