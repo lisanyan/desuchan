@@ -216,7 +216,7 @@ function get_preferred_stylesheet()
 	return null;
 }
 
-function set_inputs(id,adminMode) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!email.value) email.value=get_cookie("email"); if(subject.value) subject.value=""; if(!adminMode) { if (!password.value) password.value=get_password("password"); } } } 
+function set_inputs(id,adminMode) { with(document.getElementById(id)) {if(!field1.value) field1.value=get_cookie("name"); if(!email.value) email.value=get_cookie("email"); subject.value=""; if(!adminMode) { if (!password.value) password.value=get_password("password"); } } } 
 function set_delpass(id) { with(document.getElementById(id)) {password.value=get_cookie("password"); } }
 
 

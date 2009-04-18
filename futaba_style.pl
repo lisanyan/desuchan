@@ -19,6 +19,7 @@ use constant NORMAL_HEAD_INCLUDE => q{
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
+#adv { background: url('/include/unblockad.png') center no-repeat;padding: 0px;margin: 0px auto;text-align:center;width:750px;height:107px;}
 body { margin: 0; padding: 8px; margin-bottom: auto; }
 blockquote blockquote { margin-left: 0em }             
 form { margin-bottom: 0px }
@@ -77,6 +78,7 @@ use constant MINI_HEAD_INCLUDE => q{
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
+	#adv { background: url('/include/unblockad.png') center no-repeat; padding: 0px; margin: 0px auto; text-align: center; }
 	body { margin: 0; padding: 8px; margin-bottom: auto; }
 	blockquote blockquote { margin-left: 0em }
 	form { margin-bottom: 0px }
@@ -113,6 +115,7 @@ use constant MINI_HEAD_REFRESH_INCLUDE => q{
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
+#adv { background: url('/include/unblockad.png') center no-repeat; padding: 0px; margin: 0px auto; text-align: center; }
 body { margin: 0; padding: 8px; margin-bottom: auto; }
 blockquote blockquote { margin-left: 0em }
 form { margin-bottom: 0px }
