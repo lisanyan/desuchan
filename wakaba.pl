@@ -2291,14 +2291,17 @@ sub backup_post($;$$) # Delete single post.
 		
 		# Move image.
 		copy($this_board->path().'/'.$$row{image}, $this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').
-			$base_filename)	if ( -e $this_board->path().'/'.$$row{image} );
+			$base_filename) 
+			and chmod 0644, $this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').$base_filename
+			if ( -e $this_board->path().'/'.$$row{image} );
 
 		# Move thumbnail.
 		my $thumb_dir = $this_board->option('THUMB_DIR');
 		if (  $$row{thumbnail} =~ /^$thumb_dir/ )
 		{
 		       copy($this_board->path().'/'.$$row{thumbnail},$this_board->path().'/'.$this_board->option('ARCHIVE_DIR').
-			$this_board->option('BACKUP_DIR').$base_thumbnail) if ( -e $this_board->path().'/'.$$row{thumbnail} );
+			$this_board->option('BACKUP_DIR').$base_thumbnail) and chmod 0644, $this_board->option('BACKUP_DIR').$base_thumbnail
+			if ( -e $this_board->path().'/'.$$row{thumbnail} );
 		}
 	}
 	
@@ -2393,7 +2396,7 @@ sub restore_post_or_thread($$;$)
 		my $base_filename= $$row{image};
 		$base_filename=~s!^.*[\\/]!!; # cut off any directory in filename
 		rename ($this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').$base_filename,
-		      $this_board->path().'/'.$$row{image})
+		      $this_board->path().'/'.$$row{image}) and chmod 0644, $this_board->path().'/'.$$row{image}
 		    if ( -e $this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').$base_filename );
 
 	        # Move thumbnail, if applicable.
@@ -2403,7 +2406,7 @@ sub restore_post_or_thread($$;$)
                         $base_filename = $$row{thumbnail};
               		$base_filename =~ s!^.*[\\/]!!; # cut off any directory in filename
                         rename ($this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').$base_filename,
-			     $this_board->path().'/'.$$row{thumbnail}) 
+			     $this_board->path().'/'.$$row{thumbnail}) and chmod 0644, $this_board->path().'/'.$$row{thumbnail}
 			     if ( -e $this_board->path().'/'.$this_board->option('ARCHIVE_DIR').$this_board->option('BACKUP_DIR').$base_filename );
                 }
 	}
@@ -4373,13 +4376,15 @@ sub move_thread($$$)
 
 			# Move the image.
 			rename ( $board->path().'/'.$$res{image}, 
-			      $dest_board.'/'.$dest_board_object->option("IMG_DIR").$image_base )
-			    if ( -e $board->path().'/'.$$res{image} );
+			      $dest_board.'/'.$dest_board_object->option("IMG_DIR").$image_base ) 
+				and chmod 0644, $dest_board.'/'.$dest_board_object->option("IMG_DIR").$image_base
+				    if ( -e $board->path().'/'.$$res{image} );
 
 			# Move the thumbnail if applicable.
 			rename ( $board->path().'/'.$$res{thumbnail},
 			      $dest_board.'/'.$dest_board_object->option("THUMB_DIR").$thumb_base ) 
-			    if ($$res{thumbnail} =~ /^$thumb_dir/ && -e $board->path().'/'.$$res{thumbnail} );
+				and chmod 0644, $dest_board.'/'.$dest_board_object->option("THUMB_DIR").$thumb_base
+				    if ($$res{thumbnail} =~ /^$thumb_dir/ && -e $board->path().'/'.$$res{thumbnail} );
 		}
 
 		my $post_insert = $dbh->prepare("INSERT INTO `".$dest_board_object->option("SQL_TABLE")."` VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);") or ( $errors = 1 and make_error(S_SQLFAIL) );
