@@ -4220,7 +4220,7 @@ sub add_password_failure_to_database($;$$)
 
 	# Now, let's update the failed password entry database.
 	$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND passfail=1;") or make_error(S_SQLFAIL);
-	$sth->execute($ENV{REMOTE_ADDR}) or make_error(S_SQLFAIL);
+	$sth->execute($ip) or make_error(S_SQLFAIL);
 
 	my $failcount = ($sth->fetchrow_array)[0];
 	$sth->finish();
