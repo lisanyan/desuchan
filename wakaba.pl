@@ -4173,7 +4173,7 @@ sub add_password_failure_to_database($;$$)
 	if ($postid)
 	{
 		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post=? LIMIT 1;") or make_error(S_SQLFAIL);
-		$sth->execute($ip}, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
 	}
 	else
 	{
@@ -4243,7 +4243,7 @@ sub manage_script_bans()
 		if ($$old_entry{passfail})
 		{
 			# Unban host.
-			unban_script_access($$old_entry{ip});
+			unban_script_access($$old_entry{host});
 
 			# Delete old entry.
 			$delete_old_entry = $dbh->prepare("DELETE FROM `".SQL_PASSPROMPT_TABLE."` WHERE id = ?;") or make_error(S_SQLFAIL);
@@ -4254,7 +4254,7 @@ sub manage_script_bans()
 		}
 		else
 		{
-			add_password_failure_to_database($$old_entry{task}, $$old_entry{post}, $$old_entry{ip});
+			add_password_failure_to_database($$old_entry{task}, $$old_entry{post}, $$old_entry{host});
 		}
 	}
 
