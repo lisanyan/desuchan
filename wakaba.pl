@@ -4174,13 +4174,13 @@ sub add_password_failure_to_database($;$$$)
 	if ($postid)
 	{
 		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post=? LIMIT 1;") or make_error(S_SQLFAIL);
-		$sth->execute($ip, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board_name, $postid) or make_error(S_SQLFAIL);
 	}
 	else
 	{
 		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post IS NULL LIMIT 1;")
 			 or make_error(S_SQLFAIL);
-		$sth->execute($ip, $task, $board->path()) or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board_name) or make_error(S_SQLFAIL);
 	}
 
 	# Either insert failed session or update current session if existent.
@@ -4191,12 +4191,12 @@ sub add_password_failure_to_database($;$$$)
 		if ($postid)
 		{
 			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,?,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board->path(), $postid, time()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board_name, $postid, time()) or make_error(S_SQLFAIL);
 		}
 		else
 		{
 			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,NULL,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board->path(), time()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board_name, time()) or make_error(S_SQLFAIL);
 		}
 		
 		$sth->finish();
@@ -4208,12 +4208,12 @@ sub add_password_failure_to_database($;$$$)
 		if ($postid)
 		{
 			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post=?;") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board_name, $postid) or make_error(S_SQLFAIL);
 		}
 		else
 		{
 			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post IS NULL;") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board->path()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board_name) or make_error(S_SQLFAIL);
 		}
 		
 		$sth->finish();
