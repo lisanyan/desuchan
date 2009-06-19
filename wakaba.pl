@@ -2110,9 +2110,9 @@ sub make_backup_posts_panel($$$)
 		$page = 0 if ($page !~ /^\d+$/);
 		my $thread_offset = $page * ($board->option('IMAGES_PER_PAGE'));
 		
-		# Grab the parent posts
-		$sth=$dbh->prepare("SELECT * FROM `".SQL_BACKUP_TABLE."` WHERE parent=0 ORDER BY timestampofarchival DESC, num ASC LIMIT ".$board->option('IMAGES_PER_PAGE')." OFFSET $thread_offset;") or make_error(S_SQLFAIL);
-		$sth->execute() or make_error(S_SQLFAIL);
+		# Grab the parent posts and posts without parent threads
+		$sth=$dbh->prepare("SELECT * FROM `".SQL_BACKUP_TABLE."` A  WHERE (parent=0 OR (parent>0 AND NOT EXISTS (SELECT * FROM `".SQL_BACKUP_TABLE."` B WHERE A.parent = B.num LIMIT 1))) AND board_name=? ORDER BY timestampofarchival DESC, num ASC LIMIT ".$board->option('IMAGES_PER_PAGE')." OFFSET $thread_offset;") or make_error(S_SQLFAIL);
+		$sth->execute($board->path()) or make_error(S_SQLFAIL);
 		
 		# Grab the thread posts in each thread
 		while ($row=get_decoded_hashref($sth))
@@ -2132,42 +2132,50 @@ sub make_backup_posts_panel($$$)
 
 			my @thread = ($row);
 			my $threadnumber = $$row{postnum};
-			
-			# Grab thread replies
-			my $postcountquery=$dbh->prepare("SELECT COUNT(*) AS count, COUNT(image) AS imgcount FROM `".SQL_BACKUP_TABLE."` WHERE parent=?") or make_error(S_SQLFAIL);
-			$postcountquery->execute($threadnumber) or make_error(S_SQLFAIL);
-			my $postcountrow = $postcountquery->fetchrow_hashref();
-			my $postcount = $$postcountrow{count};
-			my $imgcount = $$postcountrow{imgcount};
-			$postcountquery->finish();
-			
-			# Grab limits for SQL query
-			my $offset = ($postcount > $board->option('REPLIES_PER_THREAD')) ? $postcount - ($board->option('REPLIES_PER_THREAD')) : 0;
+			my $imgcount = 0;
+			my $postcount = 0;
 			my $limit = $board->option('REPLIES_PER_THREAD');
 			my $shownimages = 0;
-			
-			my $threadquery=$dbh->prepare("SELECT * FROM `".SQL_BACKUP_TABLE."` WHERE parent=? ORDER BY timestampofarchival DESC, num ASC LIMIT $limit OFFSET $offset;") or make_error(S_SQLFAIL);
-			$threadquery->execute($threadnumber) or make_error(S_SQLFAIL);
-			while (my $inner_row=get_decoded_hashref($threadquery))
+			$$row{standalone} = 1;	# Indicates extracted post is orphaned in the database (i.e., without a parent thread)
+
+			unless ($$row{parent}) 		# We are grabbing both threads and orphaned posts, here.
 			{
-				my $base_filename= $$inner_row{image};
-				$base_filename=~s!^.*[\\/]!!; 			# cut off any directory in filename
+				$$row{standalone} = 0;
 
-				$$inner_row{image} = '/'.$board->path.'/'.$board->option('ARCHIVE_DIR').$board->option('BACKUP_DIR').$base_filename;
-
-				my $thumb_dir = $board->option('THUMB_DIR');
-				if ($$inner_row{thumbnail} =~ /^$thumb_dir/)
+				# Grab thread replies
+				my $postcountquery=$dbh->prepare("SELECT COUNT(*) AS count, COUNT(image) AS imgcount FROM `".SQL_BACKUP_TABLE."` WHERE parent=?") or make_error(S_SQLFAIL);
+				$postcountquery->execute($threadnumber) or make_error(S_SQLFAIL);
+				my $postcountrow = $postcountquery->fetchrow_hashref();
+				my $postcount = $$postcountrow{count};
+				my $imgcount = $$postcountrow{imgcount};
+				$postcountquery->finish();
+			
+				# Grab limits for SQL query
+				my $offset = ($postcount > $board->option('REPLIES_PER_THREAD')) ? $postcount - ($board->option('REPLIES_PER_THREAD')) : 0;
+			
+				my $threadquery=$dbh->prepare("SELECT * FROM `".SQL_BACKUP_TABLE."` WHERE parent=? ORDER BY timestampofarchival DESC, num ASC LIMIT $limit OFFSET $offset;") or make_error(S_SQLFAIL);
+				$threadquery->execute($threadnumber) or make_error(S_SQLFAIL);
+				while (my $inner_row=get_decoded_hashref($threadquery))
 				{
-					my $base_thumbnail = $$row{thumbnail};
-					$base_thumbnail =~ s!^.*[\\/]!!;		# Do the same for the thumbnail.
-					$$inner_row{thumbnail} = '/'.$board->path.'/'.$board->option('ARCHIVE_DIR').
-						$board->option('BACKUP_DIR').$base_thumbnail;
-				}
+					my $base_filename= $$inner_row{image};
+					$base_filename=~s!^.*[\\/]!!; 			# cut off any directory in filename
 
-				push @thread, $inner_row;
-				++$shownimages if $$inner_row{image};
+					$$inner_row{image} = '/'.$board->path.'/'.$board->option('ARCHIVE_DIR').$board->option('BACKUP_DIR').$base_filename;
+
+					my $thumb_dir = $board->option('THUMB_DIR');
+					if ($$inner_row{thumbnail} =~ /^$thumb_dir/)
+					{
+						my $base_thumbnail = $$row{thumbnail};
+						$base_thumbnail =~ s!^.*[\\/]!!;		# Do the same for the thumbnail.
+						$$inner_row{thumbnail} = '/'.$board->path.'/'.$board->option('ARCHIVE_DIR').
+							$board->option('BACKUP_DIR').$base_thumbnail;
+					}
+
+					push @thread, $inner_row;
+					++$shownimages if $$inner_row{image};
+				}
+				$threadquery->finish();
 			}
-			$threadquery->finish();
 	
 			push @threads,{posts=>[@thread],omit=>($postcount > $limit) ? $postcount-$limit : 0,omitimages=>($imgcount > $shownimages) ? $imgcount-$shownimages : 0};
 		}
@@ -4200,7 +4208,7 @@ sub add_password_failure_to_database($;$$$)
 	
 	$sth->finish();
 
-	# Now, let's update the failed password entry database.
+	# Now, let's count the number of failed password entries.
 	$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND passfail=1;") or make_error(S_SQLFAIL);
 	$sth->execute($ip) or make_error(S_SQLFAIL);
 
@@ -4208,7 +4216,6 @@ sub add_password_failure_to_database($;$$$)
 	$sth->finish();
 
 	# If number of failed sessions exceed PASSFAIL_THRESHOLD, ban user
-
 	ban_script_access($ENV{REMOTE_ADDR}) if ($failcount > PASSFAIL_THRESHOLD);
 }
 

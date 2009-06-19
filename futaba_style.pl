@@ -2242,8 +2242,7 @@ use constant BACKUP_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 	<loop $threads>
 		<loop $posts>
-			<if !$parent>
-				<div id="t<var $postnum>">
+			<if !$parent || $standalone>
 				<if $image>
 					<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
 					-(<em><var $size> B, <var $width>x<var $height></em>)</span>
@@ -2270,12 +2269,15 @@ use constant BACKUP_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 				<if $email><span class="postername"><a href="<var $email>"><var $name></a></span><if $trip><span class="postertrip"><a href="<var $email>"><var $trip></a></span></if></if>
 				<if !$email><span class="postername"><var $name></span><if $trip><span class="postertrip"><var $trip></span></if></if> 
 				<span class="ipaddr">(IP: <var dec_to_dot($ip)><if $admin_post eq 'yes'>; <if !$lastedit><strong>Moderator Post</strong></if><if $lastedit><strong>Moderator Edit</strong></if></if>)</span> 
-				<if $stickied> <img src="<var expand_filename('include/sticky.gif')>" alt="<const S_STICKIEDALT>" title="<const S_STICKIED>" /> </if>
-				<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
+				<if !$parent>
+					<if $stickied> <img src="<var expand_filename('include/sticky.gif')>" alt="<const S_STICKIEDALT>" title="<const S_STICKIED>" /> </if>
+					<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
+				</if>
 				<var $date></label>
 				<span class="reflink">
 					No.<var $postnum>
 				</span>&nbsp;
+				<if $standalone><span><em>(Orphaned From Parent: <a href="<var get_reply_link($parent)>"><var $parent></a> )</em></span></if>
 				<if !$thread>
 					[<a href="<var $self>?task=postbackups&amp;board=<var $board-\>path()>&amp;page=t<var $postnum>">View</a>]
 				</if>
@@ -2293,7 +2295,7 @@ use constant BACKUP_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 					</span>
 				</if>
 			</if>
-			<if $parent>
+			<if $parent && !$standalone>
 				<table><tbody><tr><td class="doubledash">&gt;&gt;</td>
 				<td class="reply" id="reply<var $postnum>">
 
@@ -2338,7 +2340,6 @@ use constant BACKUP_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 			</if>
 		
 		</loop>
-		</div>
 		<br clear="left" /><hr />
 	</loop>
 
