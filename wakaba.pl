@@ -4163,7 +4163,7 @@ sub remove_password_prompt_session_from_database($;$)
 	$remove_entry->finish();
 }
 
-sub add_password_failure_to_database($;$$)
+sub add_password_failure_to_database($;$$$)
 {
 	my ($task, $postid, $ip, $board_name) = @_;
 	my ($sth, $failcount);
