@@ -4165,10 +4165,11 @@ sub remove_password_prompt_session_from_database($;$)
 
 sub add_password_failure_to_database($;$$)
 {
-	my ($task, $postid, $ip) = @_;
+	my ($task, $postid, $ip, $board_name) = @_;
 	my ($sth, $failcount);
 
 	$ip ||= $ENV{REMOTE_ADDR};
+	$board_name ||= $board->path();
 
 	if ($postid)
 	{
@@ -4254,7 +4255,7 @@ sub manage_script_bans()
 		}
 		else
 		{
-			add_password_failure_to_database($$old_entry{task}, $$old_entry{post}, $$old_entry{host});
+			add_password_failure_to_database($$old_entry{task}, $$old_entry{post}, $$old_entry{host}, $$old_entry{boardname});
 		}
 	}
 
