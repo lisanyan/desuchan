@@ -2454,7 +2454,7 @@ sub remove_post_from_backup($$@)
 		add_log_entry($username,'backup_remove',$board->path().','.$post,
 				make_date(time()+TIME_OFFSET,DATE_STYLE),dot_to_dec($ENV{REMOTE_ADDR}),0,time());
 	}
-
+$file_contents =~ m/\n\# Script Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n/
 	make_http_forward( $ENV{HTTP_REFERER}, ALTERNATE_REDIRECT );
 }
 
@@ -3729,7 +3729,7 @@ sub remove_htaccess_entry($;$)
 	{
 	        if ($file_contents =~ m/\n\# Script Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n/)
 	        {
-	                $file_contents =~ s/\n\# Script Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n//;
+	                $file_contents =~ s/\n\# Script Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n//g;
 	        }
 	}
 	else
@@ -4278,15 +4278,18 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 		# $options_execcgi = 1 if m/Options.*?ExecCGI/i; # Unneeded
 	}
 	close HTACCESSREAD;
-	open (HTACCESS, ">>".HTACCESS_PATH.".htaccess");
-	# print HTACCESS "\n".'Options +FollowSymLinks'."\n" if !$options_followsymlinks;
-	# print HTACCESS "\n".'Options +ExecCGI'."\n" if !$options_execcgi;
-	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
-	print HTACCESS "\n".'# Script Ban added by Wakaba'."\n";
-	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS "RewriteRule \.pl http://".$ENV{SERVER_NAME}.'wakaba_access_ban.html'."\n";
-	# mod_rewrite entry. May need to be changed for different server software
-	close HTACCESS;
+	if ($file_contents !~ m/\n\# Script Ban added by Wakaba\nRewriteCond \%\{REMOTE_ADDR\} \^\Q$ip\E\$\nRewriteRule.*?\n/)
+	{
+		open (HTACCESS, ">>".HTACCESS_PATH.".htaccess");
+		# print HTACCESS "\n".'Options +FollowSymLinks'."\n" if !$options_followsymlinks;
+		# print HTACCESS "\n".'Options +ExecCGI'."\n" if !$options_execcgi;
+		print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
+		print HTACCESS "\n".'# Script Ban added by Wakaba'."\n";
+		print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
+		print HTACCESS "RewriteRule .* http://".$ENV{SERVER_NAME}.'wakaba_access_ban.html'."\n";
+		# mod_rewrite entry. May need to be changed for different server software
+		close HTACCESS;
+	}
 }
 
 sub unban_script_access($)
