@@ -2511,7 +2511,7 @@ sub make_admin_post_panel($$)
 	my @reportedposts = local_reported_posts();
 
 	# Grab board posts
-	if ($page =~ /^t\w+$/)
+	if ($page =~ /^t\d+$/)
 	{
 		$page =~ s/^t//g;
 		$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=? ORDER BY lasthit DESC, num ASC;") or make_error(S_SQLFAIL);
@@ -2552,7 +2552,7 @@ sub make_admin_post_panel($$)
 		
 		# Handle page variable
 		my $last_page = int(($threadcount + $board->option('IMAGES_PER_PAGE') - 1) / $board->option('IMAGES_PER_PAGE'))-1; 
-		$page = $last_page if (($page) * $board->option('IMAGES_PER_PAGE') + 1 > $count);
+		$page = $last_page if (($page) * $board->option('IMAGES_PER_PAGE') + 1 > $threadcount);
 		$page = 0 if ($page !~ /^\w+$/);
 		my $thread_offset = $page * ($board->option('IMAGES_PER_PAGE'));
 		
@@ -4183,7 +4183,7 @@ sub add_password_failure_to_database($;$$)
 	}
 
 	# Either insert failed session or update current session if existent.
-	unless (($sth->fetchrow_array))
+	unless (($sth->fetchrow_array)[0])
 	{
 		$sth->finish();
 
@@ -4284,7 +4284,7 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
 	print HTACCESS "\n".'# Script Ban added by Wakaba'."\n";
 	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS "RewriteRule \.pl http://".$ENV{SERVER_NAME}.'wakaba_access_ban.html')."\n";
+	print HTACCESS "RewriteRule \.pl http://".$ENV{SERVER_NAME}.'wakaba_access_ban.html'."\n";
 	# mod_rewrite entry. May need to be changed for different server software
 	close HTACCESS;
 }
