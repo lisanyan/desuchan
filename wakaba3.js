@@ -11,10 +11,13 @@ function get_cookie(name)
 
 function passfield(num,adminmode) // Bring up Password Field for [Edit] and [Delete] Links
 {
-	if (lastopenfield != num) // If the field isn't present...
+	if (lastopenfield != num || document.getElementById("movethreadselect")) // If the field isn't present...
 	{
 		// Collapse other fields
 		if (lastopenfield) { collapse_field(lastopenfield); }
+
+		// Clear form.
+		document.getElementById("delform").reset();
 		
 		// Assemble new field
 		var label = document.createElement("label");
@@ -75,15 +78,99 @@ function passfield(num,adminmode) // Bring up Password Field for [Edit] and [Del
 	}
 }
 
+function move_thread_field(num)
+{
+	if (lastopenfield != num || !document.getElementById("movethreadselect"))
+	{
+		var boards = new Array();
+		var board;
+
+		// Collapse other fields
+		if (lastopenfield) { collapse_field(lastopenfield); }
+		
+		// Clear form.
+		document.getElementById("delform").reset();
+
+		var boardSelect = document.getElementById("boardselect").getElementsByTagName("select")[0];
+		if (boardSelect.firstChild)
+		{
+			boards.push(boardSelect.firstChild.getAttribute("value"));
+			board = boardSelect.firstChild;
+
+			while (board.nextSibling)
+			{
+				board = board.nextSibling;
+				boards.push(board.getAttribute("value"));
+			}
+		}
+
+		var newBoardSelect = document.createElement("select");
+		newBoardSelect.setAttribute("name","destboard");
+
+		while (boards.length > 0)
+		{
+			var boardName = boards.shift();
+			var newOption = document.createElement("option");
+			newOption.setAttribute("id","movethreadselect");
+			newOption.setAttribute("value",boardName);
+			var optionText = document.createTextNode(boardName);
+			newOption.appendChild(optionText);
+			newBoardSelect.appendChild(newOption);
+		}
+
+		var submit = document.createElement("input");
+		submit.setAttribute("type","submit");
+		submit.setAttribute("value","OK");
+		
+		var hiddenInput = document.createElement("input");
+		hiddenInput.setAttribute("type","hidden");
+		hiddenInput.setAttribute("name","num");
+		hiddenInput.setAttribute("value",num);
+
+		var hiddenTask = document.createElement("input");
+		hiddenTask.setAttribute("type","hidden");
+		hiddenTask.setAttribute("name","task");
+		hiddenTask.setAttribute("value","move");
+		
+		var selectedspan = document.getElementById('movethreadcontent'+num);
+		selectedspan.appendChild(newBoardSelect);
+		selectedspan.appendChild(submit);
+		selectedspan.appendChild(hiddenInput);	
+		selectedspan.appendChild(hiddenTask);	
+		
+		// This is now the current open delete field
+		lastopenfield = num;
+	}
+	else
+	{
+		collapse_field(num);
+		// No fields open now
+		lastopenfield = 0;
+	}
+}
+
 function collapse_field(num)
 {
 	var newspan = document.createElement("span");
-	var form = document.getElementById("deletelink"+num);
-	var selectedspan = document.getElementById('delpostcontent'+num);
-	form.replaceChild(newspan,selectedspan);
-	newspan.style.display = "inline";
-	selectedspan.setAttribute("id","");
-	newspan.setAttribute("id","delpostcontent"+num);
+
+	if (!document.getElementById("movethreadselect"))
+	{
+		var form = document.getElementById("deletelink"+num);
+		var selectedspan = document.getElementById('delpostcontent'+num);
+		form.replaceChild(newspan,selectedspan);
+		newspan.style.display = "inline";
+		selectedspan.setAttribute("id","");
+		newspan.setAttribute("id","delpostcontent"+num);
+	}
+	else
+	{
+		var form = document.getElementById("movelink"+num);
+		var selectedspan = document.getElementById('movethreadcontent'+num);
+		form.replaceChild(newspan,selectedspan);
+		newspan.style.display = "inline";
+		selectedspan.setAttribute("id","");
+		newspan.setAttribute("id","movethreadcontent"+num);
+	}
 }
 
 function set_cookie(name,value,days)
@@ -164,7 +251,7 @@ function highlight(post)
 
 function set_stylesheet(styletitle,norefresh)
 {
-	set_cookie("wakastyle",styletitle,365);
+	set_cookie("wakabastyle",styletitle,365);
 
 	var links=document.getElementsByTagName("link");
 	var found=false;

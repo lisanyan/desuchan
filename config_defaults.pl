@@ -14,6 +14,13 @@ BEGIN {
 	eval "use constant SQL_ADMIN_TABLE => 'admin'" unless(defined &SQL_ADMIN_TABLE);
 	eval "use constant SQL_PROXY_TABLE => 'proxy'" unless(defined &SQL_PROXY_TABLE);
 	eval "use constant SQL_REPORT_TABLE => 'reports'" unless(defined &SQL_REPORT_TABLE);
+	eval "use constant SQL_BACKUP_TABLE => '__waka_backup'" unless(defined &SQL_BACKUP_TABLE);
+	eval "use constant SQL_ACCOUNT_TABLE => 'staff_accounts'" unless(defined &SQL_ACCOUNT_TABLE);
+	eval "use constant SQL_STAFFLOG_TABLE => 'staff_activity'" unless(defined &SQL_STAFFLOG_TABLE);
+	eval "use constant SQL_COMMON_SITE_TABLE => 'board_index'" unless(defined &SQL_COMMON_SITE_TABLE);
+	eval "use constant SQL_PASSPROMPT_TABLE => 'passprompt'" unless (defined &SQL_PASSPROMPT_TABLE);
+	eval "use constant SQL_PASSFAIL_TABLE => 'passfail'" unless (defined &SQL_PASSFAIL_TABLE);
+
 	eval "use constant USE_TEMPFILES => 1" unless (defined &USE_TEMPFILES);
 	eval "use constant DATE_STYLE => 'futaba'" unless (defined &DATE_STYLE);
 	eval "use constant ERRORLOG => ''" unless (defined &ERRORLOG);
@@ -35,9 +42,6 @@ BEGIN {
 	eval "use constant HTACCESS_PATH => './'" unless (defined &HTACCESS_PATH);
 	eval "use constant WAKABA_VERSION => '3.0.7 + desuchan'" unless(defined &WAKABA_VERSION);
 	eval "use constant ALTERNATE_REDIRECT => 0" unless (defined &ALTERNATE_REDIRECT);
-	eval "use constant SQL_ACCOUNT_TABLE => 'staff_accounts'" unless(defined &SQL_ACCOUNT_TABLE);
-	eval "use constant SQL_STAFFLOG_TABLE => 'staff_activity'" unless(defined &SQL_STAFFLOG_TABLE);
-	eval "use constant SQL_COMMON_SITE_TABLE => 'board_index'" unless(defined &SQL_COMMON_SITE_TABLE);
 	
 	eval "use constant SPAM_FILES => ('spam.txt')" unless(defined &SPAM_FILES); 
 	
@@ -48,6 +52,16 @@ BEGIN {
 	
 	eval "use constant REPORT_RETENTION => 60*24*3600" unless (defined &REPORT_RETENTION);
 	eval "use constant STAFF_LOG_RETENTION => 60*24*3600" unless (defined &STAFF_LOG_RETENTION);
+	
+	eval "use constant PROXY_WHITE_AGE => 14*24*3600" unless (defined &PROXY_WHITE_AGE);
+	eval "use constant PROXY_BLACK_AGE => 14*24*3600" unless (defined &PROXY_BLACK_AGE);
+	
+	eval "use constant ENABLE_POST_BACKUP => 1" unless defined (&ENABLE_POST_BACKUP);
+	eval "use constant POST_BACKUP_EXPIRE => 3600*24*14" unless defined (&POST_BACKUP_EXPIRE);
+
+	eval "use constant PASSPROMPT_EXPIRE_TO_FAILURE => 300" unless defined (&PASSPROMPT_EXPIRE_TO_FAILURE);
+	eval "use constant PASSFAIL_THRESHOLD => 5" unless defined (&PASSFAIL_THRESHOLD);
+	eval "use constant PASSFAIL_ROLLBACK => 1*24*3600" unless defined (&PASSFAIL_ROLLBACK);
 }
 
 1;

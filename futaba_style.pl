@@ -1,4 +1,6 @@
-# Board Templates
+#
+# Wakaba Mod Page Templates for (Rough) Futaba-Like Layout
+#
 
 use strict;
 
@@ -9,33 +11,35 @@ BEGIN { require "wakautils.pl" }
 #
 
 use constant NORMAL_HEAD_INCLUDE => q{
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
+<meta http-equiv="expires" content="Wed, 03 Nov 1999 12:21:14 GMT" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Cache-Control" content="no-cache" />
 <title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
-<meta http-equiv="Content-Style-Type" content="text/css" />
-<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
-#adv { background: url('/include/unblockad.png') center no-repeat;padding: 0px;margin: 0px auto;text-align:center;width:750px;height:107px;}
-body { margin: 0; padding: 8px; margin-bottom: auto; }
-blockquote blockquote { margin-left: 0em }             
-form { margin-bottom: 0px }
-form .trap { display:none }
-.postarea { text-align: center }
-.postarea table { margin: 0px auto; text-align: left }
-.thumb { border: none; float: left; margin: 2px 20px }
-.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
-.reply blockquote, blockquote :last-child { margin-bottom: 0em }
-.reflink a { color: inherit; text-decoration: none }
-.reply .filesize { margin-left: 20px }
-.userdelete { float: right; text-align: center; white-space: nowrap }
-.replypage .replylink { display: none }
-.oekinfo { font-size: small }
-.hidden { display: none }
-.inline { display: inline }
+	#adv { background: url('/include/unblockad.png') center no-repeat;padding: 0px;margin: 0px auto;text-align:center;width:750px;height:107px;} 
+	body { margin: 0; padding: 8px; margin-bottom: auto; }
+	blockquote blockquote { margin-left: 0em }             
+	form { margin-bottom: 0px }
+	form .trap { display:none }
+	.postarea { text-align: center }
+	.postarea table { margin: 0px auto; text-align: left }
+	.thumb { border: none; float: left; margin: 2px 20px }
+	.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
+	.reply blockquote, blockquote :last-child { margin-bottom: 0em }
+	.reflink a { color: inherit; text-decoration: none }
+	.reply .filesize { margin-left: 20px }
+	.userdelete { float: right; text-align: center; white-space: nowrap }
+	.replypage .replylink { display: none }
+	.oekinfo { font-size: small }
+	.hidden { display: none }
+	.inline { display: inline }
 </style>
 
 <loop $stylesheets>
@@ -56,7 +60,7 @@ form .trap { display:none }
 </loop>
 -
 [<a href="<var expand_filename(HOME)>" target="_top"><const S_HOME></a>]
-[<a href="<var get_secure_script_name()>?task=admin&amp;board=<var $board-\>path()>"><const S_ADMIN></a>]
+[<a href="<var get_secure_script_name()>?task=loginpanel&amp;board=<var $board-\>path()>"><const S_ADMIN></a>]
 </div>
 
 <div class="logo">
@@ -68,17 +72,15 @@ form .trap { display:none }
 };
 
 use constant MINI_HEAD_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-<title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
+<title><var $board-\>path()> - <var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
-<meta http-equiv="Content-Style-Type" content="text/css" />
-<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
-	#adv { background: url('/include/unblockad.png') center no-repeat; padding: 0px; margin: 0px auto; text-align: center; }
+	#adv { background: url('/include/unblockad.png') center no-repeat;padding: 0px;margin: 0px auto;text-align:center;width:750px;height:107px;} 
 	body { margin: 0; padding: 8px; margin-bottom: auto; }
 	blockquote blockquote { margin-left: 0em }
 	form { margin-bottom: 0px }
@@ -105,30 +107,28 @@ use constant MINI_HEAD_INCLUDE => q{
 };
 
 use constant MINI_HEAD_REFRESH_INCLUDE => q{
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">}."\n\n".q{
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <title><if $title><var $title> - </if><var $board-\>option('TITLE')></title>
 <meta http-equiv="Content-Type" content="text/html;charset=<const CHARSET>" />
-<meta http-equiv="Content-Style-Type" content="text/css" />
-<meta name="keywords" content="<var $board-\>option('METAKEYWORDS')>" />
 <link rel="shortcut icon" href="<var expand_filename($board-\>option('FAVICON'))>" />
 
 <style type="text/css">
-#adv { background: url('/include/unblockad.png') center no-repeat; padding: 0px; margin: 0px auto; text-align: center; }
-body { margin: 0; padding: 8px; margin-bottom: auto; }
-blockquote blockquote { margin-left: 0em }
-form { margin-bottom: 0px }
-form .trap { display:none }
-.postarea { text-align: center }
-.postarea table { margin: 0px auto; text-align: left }
-.thumb { border: none; float: left; margin: 2px 20px }
-.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
-.reply blockquote, blockquote :last-child { margin-bottom: 0em }
-.reflink a { color: inherit; text-decoration: none }
-.reply .filesize { margin-left: 20px }
-.userdelete { float: right; text-align: center; white-space: nowrap }
-.replypage .replylink { display: none }
+	#adv { background: url('/include/unblockad.png') center no-repeat; padding: 0px; margin: 0px auto; text-align: center; }
+	body { margin: 0; padding: 8px; margin-bottom: auto; }
+	blockquote blockquote { margin-left: 0em }
+	form { margin-bottom: 0px }
+	form .trap { display:none }
+	.postarea { text-align: center }
+	.postarea table { margin: 0px auto; text-align: left }
+	.thumb { border: none; float: left; margin: 2px 20px }
+	.nothumb { float: left; background: #eee; border: 2px dashed #aaa; text-align: center; margin: 2px 20px; padding: 1em 0.5em 1em 0.5em; }
+	.reply blockquote, blockquote :last-child { margin-bottom: 0em }
+	.reflink a { color: inherit; text-decoration: none }
+	.reply .filesize { margin-left: 20px }
+	.userdelete { float: right; text-align: center; white-space: nowrap }
+	.replypage .replylink { display: none }
 </style>
 
 <loop $stylesheets>
@@ -153,11 +153,13 @@ use constant PAGINATION_SECTION => q{
 	<div align="center">
 		There were <strong><var $rowcount></strong> entries found. Showing <var $perpage> per page.
 		<br />
-		<if $page != 1><a href="<var $rooturl>&amp;page=1&amp;perpage=<var $perpage>"></if>
-		&lt;&lt;<if $page != 1></a></if> 
+		<span>
+			<if $page != 1 && $number_of_pages><a href="<var $rooturl>&amp;page=1&amp;perpage=<var $perpage>"></if>
+			&lt;&lt;<if $page != 1 && $number_of_pages></a></if> 
+		</span>
 		<span style="padding-left:1em">
-			<if $page != 1><a href="<var $rooturl>&amp;page=<var $page-1>&amp;perpage=<var $perpage>"></if>
-			&lt;<if $page != 1></a></if>
+			<if $page != 1 && $number_of_pages><a href="<var $rooturl>&amp;page=<var $page-1>&amp;perpage=<var $perpage>"></if>
+			&lt;<if $page != 1 && $number_of_pages></a></if>
 		</span>
 		<span style="padding-left:2em;padding-right:2em">Page <var $page> of <var $number_of_pages></span> 
 		<span style="padding-right:1em">
@@ -303,7 +305,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 				<if $thumbnail>
 					<a target="_blank" href="<var expand_image_filename($image)>" >
-					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
+					<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" /></a>
 				</if>
 				<if !$thumbnail>
 					<if $board-\>option('DELETED_THUMBNAIL')>
@@ -419,7 +421,8 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 <input type="hidden" name="board" value="<var $board-\>path>" />
 <const S_REPDEL>[<label><input type="checkbox" name="fileonly" value="on" /><const S_DELPICONLY></label>] 
 <const S_DELKEY><input type="password" name="password" size="8" /> 
-<input value="<const S_DELETE>" name="task" type="submit" /></td></tr>
+<input value="<const S_DELETE>" name="task" type="submit" />
+</td></tr>
 <tr><td>Report Post(s) to Staff <input value="Report" name="task" type="submit" /></td></tr>
 </tbody></table>
 </form>
@@ -476,7 +479,8 @@ use constant PASSWORD => compile_template (MINI_HEAD_INCLUDE. q{
 
 use constant DELPASSWORD => compile_template (MINI_HEAD_INCLUDE. q{
 	<h1 style="text-align:center;font-size:1em">Deleting Post No.<var $num></h1>
-	<form action="<var $self>?board=<var $board-\>path()>" method="post" id="delform">	
+	<form action="<var $self>" method="post" id="delform">	
+	<input type="hidden" name="board" value="<var $board-\>path()>" />
 	<input type="hidden" name="task" value="delete" />
 	<input type="hidden" name="num" value="<var $num>" />
 	<input type="hidden" name="fromwindow" value="1" />
@@ -648,9 +652,10 @@ use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 
 <span style="float:left">[<a href="<var expand_filename($board-\>option('HTML_SELF'),1)>"><const S_MANARET></a>]</span>
 <if $admin>
-<div style="float:right;font-size:85%">
-	<span style="float:left;padding-left:2em">[<a href="<var $self>?task=mpanel&amp;board=<var $board-\>path()>"><const S_MANAPANEL></a>] </span>
+<div style="float:right;font-size:85%;padding-left:2em">
+	<span style="float:left">[<a href="<var $self>?task=mpanel&amp;board=<var $board-\>path()>"><const S_MANAPANEL></a>] </span>
 	<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=reports&amp;board=<var $board-\>path()>">Reports</a>] </span>
+	<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=postbackups&amp;board=<var $board-\>path()>">Trash Bin</a>] </span>
 	<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=bans&amp;board=<var $board-\>path()>"><const S_MANABANS></a>] </span>
 	<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=proxy&amp;board=<var $board-\>path()>"><const S_MANAPROXY></a>] </span>
 	<if $type eq 'admin'>
@@ -662,11 +667,12 @@ use constant MANAGER_HEAD_INCLUDE => NORMAL_HEAD_INCLUDE.q{
 	<if $type eq 'admin'>
 		<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=staff&amp;board=<var $board-\>path()>">Staff Management</a>] </span>
 		<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=stafflog&amp;board=<var $board-\>path()>">Staff Activity</a>] </span>
+		<span style="float:left;padding-left:0.2em">[<a href="<var $self>?task=security&amp;board=<var $board-\>path()>">Script Security</a>] </span>
 	</if>
 </div>
 </if>
 <div class="passvalid" style="clear:both"><strong><const S_MANAMODE></strong></div>
-<if $admin><div style="margin-top:0;float:left;font-size:120%;font-weight:bold">&rarr; </div><div style="margin-top:0;margin-left:0.2em;float:left">Logged in as <span class="postername"><var $username></span> (<if $type eq 'admin'>Administrator</if><if $type eq 'mod'>Moderator</if><if $type eq 'globmod'>Global Moderator</if>). [<a href="<var $self>?task=edituserwindow&amp;username=<var $username>&amp;board=<var $board-\>path()>">Options</a>] [<a href="<var $self>?task=logout&amp;board=<var $board-\>path()>"><const S_MANALOGOUT></a>] <form action="wakaba.pl" method="get" style="display:block"><input type="hidden" name="task" value="admin" /><label>Switch to board: <select name="board"><loop $boards_select><option value="<var $board_entry>"><var $board_entry></option></loop></select></label> <input type="submit" name="switchboard" value="Go" /></form></div>
+<if $admin><div style="margin-top:0;float:left;font-size:120%;font-weight:bold">&rarr; </div><div style="margin-top:0;margin-left:0.2em;float:left">Logged in as <span class="postername"><var $username></span> (<if $type eq 'admin'>Administrator</if><if $type eq 'mod'>Moderator</if><if $type eq 'globmod'>Global Moderator</if>). [<a href="<var $self>?task=edituserwindow&amp;username=<var $username>&amp;board=<var $board-\>path()>">Options</a>] [<a href="<var $self>?task=logout&amp;board=<var $board-\>path()>"><const S_MANALOGOUT></a>] <form action="wakaba.pl" id="boardselect" method="get" style="display:block"><input type="hidden" name="task" value="admin" /><label>Switch to board: <select name="board"><loop $boards_select><option value="<var $board_entry>"><var $board_entry></option></loop></select></label> <input type="submit" name="switchboard" value="Go" /></form></div>
 <if $type ne 'mod'><div style="margin-top:0;float:right"><strong>Global Options:</strong> [<a href="<var $self>?task=rebuildglobal&amp;board=<var $board-\>path()>">Rebuild Cache</a>]<if $type eq 'admin'> [<a href="<var $self>?task=restart&amp;board=<var $board-\>path()>">Restart Script</a>]</if></div></if></if>
 <br clear="all"/>
 };
@@ -716,7 +722,7 @@ Password:
 <label><input type="checkbox" name="savelogin" /> <const S_MANASAVE></label>
 <br />
 <select name="nexttask">
-<option value="mpanel" <if $login_task eq "mpanel">selected="selected"</if>><const S_MANAPANEL></option>
+<option value="mpanel" <if $login_task eq "mpanel" || !$login_task>selected="selected"</if>><const S_MANAPANEL></option>
 <option value="bans" <if $login_task eq "bans">selected="selected"</if>><const S_MANABANS></option>
 <option value="proxy" <if $login_task eq "proxy">selected="selected"</if>><const S_MANAPROXY></option>
 <option value="spam" <if $login_task eq "spam">selected="selected"</if>><const S_MANASPAM></option>
@@ -724,6 +730,9 @@ Password:
 <option value="sql" <if $login_task eq "sql">selected="selected"</if>><const S_MANASQLINT></option>
 <option value="mpost" <if $login_task eq "mpost">selected="selected"</if>><const S_MANAPOST></option>
 <option value="rebuild" <if $login_task eq "rebuild">selected="selected"</if>><const S_MANAREBUILD></option>
+<option value="reports" <if $login_task eq "reports">selected="selected"</if>>Reports</option>
+<option value="staff" <if $login_task eq "staff">selected="selected"</if>>Staff Management</option>
+<option value="staff" <if $login_task eq "stafflog">selected="selected"</if>>Staff Activity</option>
 <option value=""></option>
 <option value="nuke" <if $login_task eq "nuke">selected="selected"</if>><const S_MANANUKE></option>
 </select>
@@ -818,7 +827,6 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <!-- Manager Post Area -->
 <div class="dellist"><h3><const S_MANAPOST></h3></div>
 	
-<div align="center"><em><const S_NOTAGS></em></div>
 <br />
 
 <div class="postarea">
@@ -827,7 +835,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <input type="hidden" name="board" value="<var $board-\>path()>" />
 <input type="hidden" name="adminpost" value="1" />
 <input type="hidden" name="no_captcha" value="1" />
-<input type="hidden" name="no_format" value="1" />
+
 <if $thread><input type="hidden" name="parent" value="<var $thread>" /></if>
 
 <table><tbody>
@@ -880,14 +888,13 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 </if>
 
 <form action="<var $self>" method="post" id="delform">
-<input type="hidden" name="task" value="delete" />
 <input type="hidden" name="board" value="<var $board-\>path>" />
 <input type="hidden" name="admindelete" value="1" />
 
 <div class="delbuttons" style="float:right">
 <input type="hidden" name="caller" value="board" />
-<input type="submit" value="<const S_MPDELETE>" />
-<input type="submit" name="archive" value="<const S_MPARCHIVE>" />
+<input type="submit" name="task" value="<const S_MPDELETE>" />
+<input type="submit" name="task" value="<const S_MPARCHIVE>" />
 <input type="reset" value="<const S_MPRESET>" />
 [<label><input type="checkbox" name="fileonly" value="on" /><const S_MPONLYPIC></label>]
 </div>
@@ -943,7 +950,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 				[<a href="<var $self>?task=mpanel&amp;board=<var $board-\>path()>&amp;page=t<var $num>"><const S_REPLY></a>]
 			</if>
 			<br />
-			<span class="threadopts" style="padding-left:2em;font-size:small"><strong>Thread Options:</strong> [<if !$stickied><a href="<var $self>?task=sticky&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Sticky</a></if><if $stickied><a href="<var $self>?task=unsticky&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Unsticky</a></if>] [<if $locked ne 'yes'><a href="<var $self>?task=lock&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Lock</a></if><if $locked eq 'yes'><a href="<var $self>?task=unlock&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Unlock</a></if>] [<a href="<var $self>?task=banthread&amp;board=<var $board-\>path()>&amp;num=<var $num>" onclick="popUpPost('<var $self>?task=banthread&amp;board=<var $board-\>path()>&amp;num=<var $num>');return false">Ban Thread</a>]</span>
+			<span class="threadopts" style="padding-left:2em;font-size:small"><strong>Thread Options:</strong> [<if !$stickied><a href="<var $self>?task=sticky&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Sticky</a></if><if $stickied><a href="<var $self>?task=unsticky&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Unsticky</a></if>] [<if $locked ne 'yes'><a href="<var $self>?task=lock&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Lock</a></if><if $locked eq 'yes'><a href="<var $self>?task=unlock&amp;thread=<var $num>&amp;board=<var $board-\>path()>">Unlock</a></if>] [<a href="<var $self>?task=banthread&amp;board=<var $board-\>path()>&amp;num=<var $num>" onclick="popUpPost('<var $self>?task=banthread&amp;board=<var $board-\>path()>&amp;num=<var $num>');return false">Ban Thread</a>] <span id="movelink<var $num>">[<a href="#" onclick="move_thread_field(<var $num>); return false">Move</a>]<span id="movethreadcontent<var $num>"></span></span></span>
 
 			<blockquote>
 			<var $comment>
@@ -1018,8 +1025,8 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <div class="delbuttons" style="float:right">
 <input type="submit" name="task" value="<const S_MPDELETE>" />
 <input type="submit" name="task" value="<const S_MPARCHIVE>" />
-<input type="reset" value="<const S_MPRESET>" />
 [<label><input type="checkbox" name="fileonly" value="on" /><const S_MPONLYPIC></label>]
+<input type="reset" value="<const S_MPRESET>" />
 </div>
 </form>
 
@@ -1048,7 +1055,7 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 
 <hr />
 
-<div class="dellist"><h3>Nuke Spam (in This Board) by IP</h3></div>
+<div class="dellist"><h3>Nuke Spam by IP</h3></div>
 
 <div class="postarea">
 <form action="<var $self>" method="post">
@@ -1056,7 +1063,8 @@ use constant POST_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
 <input type="hidden" name="board" value="<var $board-\>path()>" />
 <table><tbody>
 <tr><td class="postblock"><const S_BANIPLABEL></td><td><input type="text" name="ip" size="24" /></td></tr>
-<tr><td class="postblock"><const S_BANMASKLABEL></td><td><input type="text" name="mask" size="24" />
+<tr><td class="postblock"><const S_BANMASKLABEL></td><td><input type="text" name="mask" size="24" /> 
+<label> [ <input type="checkbox" name="global" value="1" /> <if $type eq "mod">All controlled boards</if><if $type ne "mod">Global</if> ]</label>
 <input type="submit" value="<const S_MPDELETEIP>" /></td></tr>
 </tbody></table></form>
 </div>
@@ -1208,7 +1216,7 @@ use constant STAFF_MANAGEMENT => compile_template(MANAGER_HEAD_INCLUDE.q{
 			<if $account eq 'globmod'>Global Moderator</if></td>
 			<td><if $account ne 'mod'><em>All</em></if><if $account eq 'mod'><var $reign></if></td>
 			<td><if $action><var get_action_name($action)> on <var $actiondate> [<a href="<var $self>?task=stafflog&amp;board=<var $board-\>path()>&amp;view=user&amp;usertoview=<var $username>">View All</a>]</if><if !$action><em>None</em></if></td>
-			<td>[<a href="<var $self>?task=edituserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Edit</a>] [<if $disabled><a href="<var $self>?task=enableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Enable</a></if><if !$disabled><a href="<var $self>?task=disableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Disable</a></if>] [<a href="<var $self>?task=deleteuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Remove</a>]</td>
+			<td>[<a href="<var $self>?task=edituserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Edit</a>] [<if $disabled><a href="">Enable</a></if><if !$disabled><a href="<var $self>?task=disableuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Disable</a></if>] [<a href="<var $self>?task=deleteuserwindow&amp;board=<var $board-\>path()>&amp;username=<var $username>">Remove</a>]</td>
 		</tr>
 	</loop>
 	</tbody>
@@ -2098,6 +2106,42 @@ use constant BAN_THREAD_TEMPLATE => compile_template(MINI_HEAD_INCLUDE.q{
 	</form>
 }.MINI_FOOT_INCLUDE);
 
+use constant SCRIPT_SECURITY_PANEL => compile_template(MANAGER_HEAD_INCLUDE.q{
+	<div class="dellist"><h2>Script Security</h2></div>
+
+	<table align="center">
+		<tbody>
+			<tr>
+				<th>ID</th>
+				<th>IP Address</th>
+				<th>Task</th>
+				<th>Board</th>
+				<th>Post</th>
+				<th>Expiration</th>
+				<th>Failure?</th>
+			</tr>
+			<loop $entries>
+				<tr>
+					<td><var $id></td>
+					<td><var $host></td>
+					<td><var $task></td>
+					<td><var $boardname></td>
+					<td><if $post><var $post></if><if !$post>N/A</if></td>
+					<td><var $expiration></td>
+					<td><if $passfail>Yes</if><if !$passfail>No</if></td>
+				</tr>
+			</loop>
+		</tbody>
+	</table>
+
+	<div align="center">
+		<h3>Unban Host From Script Access</h3>	
+		<form action="<var $self>" method="get">
+			<label>IP Address: <input type="text" name="ip" /></label> <input type="submit" value="Forgive" />
+		</form>	
+	</div>
+}.NORMAL_FOOT_INCLUDE);
+
 
 #
 # Post Reporting
@@ -2151,13 +2195,191 @@ use constant REPORT_RESOLVED => compile_template(MANAGER_HEAD_INCLUDE.q{
 <if $referer><p align="center" style="font-size:2em"><a href="<var escamp($referer)>">Return</a></p></if>
 }.NORMAL_FOOT_INCLUDE);	
 
+use constant BACKUP_PANEL_TEMPLATE => compile_template(MANAGER_HEAD_INCLUDE.q{
+<div class="dellist"><h2>Trash Bin</h2></div>
+<if !POST_BACKUP><p align="center"><em>Wakaba is not set to backup deletions/edits at this time.</em></p></if>
+<if POST_BACKUP>
+	<p align="center"><em>Wakaba is currently set to purge all posts older than <var &POST_BACKUP_EXPIRE/24/3600> day(s) old.</em></p>
+	<hr />
+
+	<if !$thread>
+		<table border="1" style="float:left"><tbody><tr><td>
+
+		<if $prevpage ne 'none'><form method="get" action="<var $self>"><input type="hidden" name="task" value="postbackups" /><input type="hidden" name="board" value="<var $board-\>path()>" /><input type="hidden" name="page" value="<var $prevpage>" /><input value="<const S_PREV>" type="submit" /></form></if>
+		<if $prevpage eq 'none'><const S_FIRSTPG></if>
+
+		</td><td>
+
+		<loop $pages>
+			<if !$current>[<a href="<var $filename>"><var $page></a>]</if>
+			<if $current>[<var $page>]</if>
+		</loop>
+
+		</td><td>
+
+		<if $nextpage ne 'none'><form method="get" action="<var $self>"><input type="hidden" name="task" value="postbackups" /><input type="hidden" name="board" value="<var $board-\>path()>" /><input type="hidden" name="page" value="<var $nextpage>" /><input value="<const S_NEXT>" type="submit" /></form></if>
+		<if $nextpage eq 'none'><const S_LASTPG></if>
+
+		</td></tr></tbody></table>
+	</if>
+	<if $thread>
+		<span style="float:left">[<a href="<var $self>?task=postbackups&amp;board=<var $board-\>path()>">Return to Panel</a>]</span>
+	</if>
+
+	<form action="<var $self>" method="post" id="delform">
+	<input type="hidden" name="board" value="<var $board-\>path>" />
+	<input type="hidden" name="admindelete" value="1" />
+	<input type="hidden" name="task" value="restorebackups" />
+
+	<div class="delbuttons" style="float:right">
+	<input type="submit" name="handle" value="Restore" />
+	<input type="submit" name="handle" value="<const S_MPDELETE>" />
+	<input type="reset" value="<const S_MPRESET>" />
+	</div>
+
+	<br clear="all" />
+	<hr />
+
+	<loop $threads>
+		<loop $posts>
+			<if !$parent>
+				<div id="t<var $postnum>">
+				<if $image>
+					<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
+					-(<em><var $size> B, <var $width>x<var $height></em>)</span>
+					<span class="thumbnailmsg"><const S_THUMB></span><br />
+
+					<if $thumbnail>
+						<a target="_blank" href="<var expand_image_filename($image)>" >
+						<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
+					</if>
+					<if !$thumbnail>
+						<if $board-\>option('DELETED_THUMBNAIL')>
+							<a target="_blank" href="<var expand_image_filename($board-\>option('DELETED_IMAGE'))>">
+							<img src="<var expand_filename($board-\>option('DELETED_THUMBNAIL'))>" width="<var $tn_width>" height="<var $tn_height>" alt="" class="thumb" /></a>
+						</if>
+						<if !($board-\>option('DELETED_THUMBNAIL'))>
+							<div class="nothumb"><a target="_blank" href="<var expand_image_filename($image)>"><const S_NOTHUMB></a></div>
+						</if>
+					</if>
+				</if>
+
+				<a name="<var $postnum>"></a>
+				<label><input type="checkbox" name="num" value="<var $postnum>" />
+				<span class="filetitle"><var $subject></span>
+				<if $email><span class="postername"><a href="<var $email>"><var $name></a></span><if $trip><span class="postertrip"><a href="<var $email>"><var $trip></a></span></if></if>
+				<if !$email><span class="postername"><var $name></span><if $trip><span class="postertrip"><var $trip></span></if></if> 
+				<span class="ipaddr">(IP: <var dec_to_dot($ip)><if $admin_post eq 'yes'>; <if !$lastedit><strong>Moderator Post</strong></if><if $lastedit><strong>Moderator Edit</strong></if></if>)</span> 
+				<if $stickied> <img src="<var expand_filename('include/sticky.gif')>" alt="<const S_STICKIEDALT>" title="<const S_STICKIED>" /> </if>
+				<if $locked eq 'yes'> <img src="<var expand_filename('include/locked.gif')>" alt="<const S_LOCKEDALT>" title="<const S_LOCKED>" /> </if>
+				<var $date></label>
+				<span class="reflink">
+					No.<var $postnum>
+				</span>&nbsp;
+				<if !$thread>
+					[<a href="<var $self>?task=postbackups&amp;board=<var $board-\>path()>&amp;page=t<var $postnum>">View</a>]
+				</if>
+				<br />
+				<blockquote>
+				<var $comment>
+				<if $abbrev><div class="abbrev">}.sprintf(S_ABBRTEXT,'<var $self>?task=postbackups&amp;board=<var $board-\>path>&amp;page=t<var $postnum>').q{</div></if>
+				<if $lastedit><p style="font-size: small; font-style: italic"><const S_LASTEDITED><if $admin_post eq 'yes'> <const S_BYMOD></if> <var $lastedit>. (IP: <var dec_to_dot($lastedit_ip)>)</p></if>
+				</blockquote>
+
+				<if $omit>
+					<span class="omittedposts">
+					<if $omitimages><var sprintf S_ABBRIMG,$omit,$omitimages></if>
+					<if !$omitimages><var sprintf S_ABBR,$omit></if>
+					</span>
+				</if>
+			</if>
+			<if $parent>
+				<table><tbody><tr><td class="doubledash">&gt;&gt;</td>
+				<td class="reply" id="reply<var $postnum>">
+
+				<a name="<var $postnum>"></a>
+				<label><input type="checkbox" name="num" value="<var $postnum>" />
+				<span class="replytitle"><var $subject></span>
+				<if $email><span class="commentpostername"><a href="<var $email>"><var $name></a></span><if $trip><span class="postertrip"><a href="<var $email>"><var $trip></a></span></if></if>
+				<if !$email><span class="commentpostername"><var $name></span><if $trip><span class="postertrip"><var $trip></span></if></if> 
+				<span class="ipaddr">(IP: <var dec_to_dot($ip)><if $admin_post eq 'yes'>; <if !$lastedit><strong>Moderator Post</strong></if><if $lastedit><strong>Moderator Edit</strong></if></if>)</span> 
+				<var $date></label>
+				<span class="reflink">
+					No.<var $postnum>
+				</span>&nbsp;
+				<if $image>
+					<br />
+					<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
+					-(<em><var $size> B, <var $width>x<var $height></em>)</span>
+					<span class="thumbnailmsg"><const S_THUMB></span><br />
+
+					<if $thumbnail>
+						<a target="_blank" href="<var expand_image_filename($image)>">
+						<img src="<var expand_filename($thumbnail)>" width="<var $tn_width>" height="<var $tn_height>" alt="<var $size>" class="thumb" id="img<var get_filename($image)>" /></a>
+					</if>
+					<if !$thumbnail>
+						<if $board-\>option('DELETED_THUMBNAIL')>
+							<a target="_blank" href="<var expand_image_filename($board-\>option('DELETED_IMAGE'))>">
+							<img src="<var expand_filename($board-\>option('DELETED_THUMBNAIL'))>" width="<var $tn_width>" height="<var $tn_height>" alt="" class="thumb" /></a>
+						</if>
+						<if !($board-\>option('DELETED_THUMBNAIL'))>
+							<div class="nothumb"><a target="_blank" href="<var expand_image_filename($image)>"><const S_NOTHUMB></a></div>
+						</if>
+					</if>
+				</if>
+
+				<blockquote>
+				<var $comment>
+				<if $abbrev><div class="abbrev">}.sprintf(S_ABBRTEXT,"<var \$self>?task=postbackups&amp;board=<var \$board-\\>path()>&amp;page=t<var \$parent>#<var \$postnum>").q{</div></if>
+				<if $lastedit><p style="font-size: small; font-style: italic">Last edited<if $admin_post eq 'yes'> by moderator</if> <var $lastedit>. (IP: <var dec_to_dot($lastedit_ip)>)</p></if>
+				</blockquote>
+
+				</td></tr></tbody></table>
+			</if>
+		
+		</loop>
+		</div>
+		<br clear="left" /><hr />
+	</loop>
+
+	<div class="delbuttons" style="float:right">
+	<input type="submit" name="handle" value="Restore" />
+	<input type="submit" name="handle" value="<const S_MPDELETE>" />
+	<input type="reset" value="<const S_MPRESET>" />
+	</div>
+	</form>
+
+	<if !$thread>
+		<table border="1" style="float:left"><tbody><tr><td>
+
+		<if $prevpage ne 'none'><form method="get" action="<var $self>"><input type="hidden" name="task" value="postbackups" /><input type="hidden" name="board" value="<var $board-\>path()>" /><input type="hidden" name="page" value="<var $prevpage>" /><input value="<const S_PREV>" type="submit" /></form></if>
+		<if $prevpage eq 'none'><const S_FIRSTPG></if>
+
+		</td><td>
+
+		<loop $pages>
+			<if !$current>[<a href="<var $filename>"><var $page></a>]</if>
+			<if $current>[<var $page>]</if>
+		</loop>
+
+		</td><td>
+
+		<if $nextpage ne 'none'><form method="get" action="<var $self>"><input type="hidden" name="task" value="postbackups" /><input type="hidden" name="board" value="<var $board-\>path()>" /><input type="hidden" name="page" value="<var $nextpage>" /><input value="<const S_NEXT>" type="submit" /></form></if>
+		<if $nextpage eq 'none'><const S_LASTPG></if>
+
+		</td></tr></tbody></table>
+	</if>
+
+	<br clear="all" />
+</if>
+}.NORMAL_FOOT_INCLUDE);
+
 #
 # Oekaki
 #
 
 # terrible quirks mode code
 use constant OEKAKI_PAINT_TEMPLATE => compile_template(q{
-
 <html>
 <head>
 <style type="text/css">
