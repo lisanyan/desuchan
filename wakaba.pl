@@ -4163,21 +4163,23 @@ sub remove_password_prompt_session_from_database($;$)
 	$remove_entry->finish();
 }
 
-sub add_password_failure_to_database($;$)
+sub add_password_failure_to_database($;$$)
 {
-	my ($task, $postid) = @_;
+	my ($task, $postid, $ip) = @_;
 	my ($sth, $failcount);
+
+	$ip ||= $ENV{REMOTE_ADDR};
 
 	if ($postid)
 	{
 		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post=? LIMIT 1;") or make_error(S_SQLFAIL);
-		$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
+		$sth->execute($ip}, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
 	}
 	else
 	{
 		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post IS NULL LIMIT 1;")
 			 or make_error(S_SQLFAIL);
-		$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path()) or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board->path()) or make_error(S_SQLFAIL);
 	}
 
 	# Either insert failed session or update current session if existent.
@@ -4188,12 +4190,12 @@ sub add_password_failure_to_database($;$)
 		if ($postid)
 		{
 			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,?,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path(), $postid, time()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board->path(), $postid, time()) or make_error(S_SQLFAIL);
 		}
 		else
 		{
 			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,NULL,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path(), time()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board->path(), time()) or make_error(S_SQLFAIL);
 		}
 		
 		$sth->finish();
@@ -4205,12 +4207,12 @@ sub add_password_failure_to_database($;$)
 		if ($postid)
 		{
 			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post=?;") or make_error(S_SQLFAIL);
-			$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board->path(), $postid) or make_error(S_SQLFAIL);
 		}
 		else
 		{
 			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post IS NULL;") or make_error(S_SQLFAIL);
-			$sth->execute($ENV{REMOTE_ADDR}, $task, $board->path()) or make_error(S_SQLFAIL);
+			$sth->execute($ip, $task, $board->path()) or make_error(S_SQLFAIL);
 		}
 		
 		$sth->finish();
@@ -4252,7 +4254,7 @@ sub manage_script_bans()
 		}
 		else
 		{
-			add_password_failure_to_database($$old_entry{task}, $$old_entry{post});
+			add_password_failure_to_database($$old_entry{task}, $$old_entry{post}, $$old_entry{ip});
 		}
 	}
 
@@ -4282,7 +4284,7 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
 	print HTACCESS "\n".'# Script Ban added by Wakaba'."\n";
 	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS "RewriteRule \.pl http://".root_path_to_filename('wakaba_access_ban.html')."\n";
+	print HTACCESS "RewriteRule \.pl http://".$ENV{SERVER_NAME}.'wakaba_access_ban.html')."\n";
 	# mod_rewrite entry. May need to be changed for different server software
 	close HTACCESS;
 }
