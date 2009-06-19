@@ -4171,53 +4171,34 @@ sub add_password_failure_to_database($;$$$)
 	$ip ||= $ENV{REMOTE_ADDR};
 	$board_name ||= $board->path();
 
+	# Delete expired session record from database
 	if ($postid)
 	{
-		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post=? LIMIT 1;") or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("DELETE FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post=? AND passfail=0;") or make_error(S_SQLFAIL);
 		$sth->execute($ip, $task, $board_name, $postid) or make_error(S_SQLFAIL);
 	}
 	else
 	{
-		$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post IS NULL LIMIT 1;")
-			 or make_error(S_SQLFAIL);
+		$sth=$dbh->prepare("DELETE FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND task=? AND boardname=? AND post IS NULL AND passfail=0;") or make_error(S_SQLFAIL);
 		$sth->execute($ip, $task, $board_name) or make_error(S_SQLFAIL);
 	}
 
-	# Either insert failed session or update current session if existent.
-	unless (($sth->fetchrow_array)[0])
-	{
-		$sth->finish();
+	$sth->finish();
 
-		if ($postid)
-		{
-			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,?,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board_name, $postid, time()) or make_error(S_SQLFAIL);
-		}
-		else
-		{
-			$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,NULL,?,1);") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board_name, time()) or make_error(S_SQLFAIL);
-		}
-		
-		$sth->finish();
+	# Replace with failed session record (passfail=1). This permits multiple records for the same action, so that logins can block IPs after
+	# so many incorrect tries. It may also be a tad faster.
+	if ($postid)
+	{
+		$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,?,?,1);") or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board_name, $postid, time()) or make_error(S_SQLFAIL);
 	}
 	else
 	{
-		$sth->finish();
-
-		if ($postid)
-		{
-			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post=?;") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board_name, $postid) or make_error(S_SQLFAIL);
-		}
-		else
-		{
-			$sth=$dbh->prepare("UPDATE `".SQL_PASSPROMPT_TABLE."` SET passfail=1 WHERE host=? AND task=? AND boardname=? AND post IS NULL;") or make_error(S_SQLFAIL);
-			$sth->execute($ip, $task, $board_name) or make_error(S_SQLFAIL);
-		}
-		
-		$sth->finish();
+		$sth=$dbh->prepare("INSERT INTO `".SQL_PASSPROMPT_TABLE."` VALUES (NULL,?,?,?,NULL,?,1);") or make_error(S_SQLFAIL);
+		$sth->execute($ip, $task, $board_name, time()) or make_error(S_SQLFAIL);
 	}
+	
+	$sth->finish();
 
 	# Now, let's update the failed password entry database.
 	$sth = $dbh->prepare("SELECT COUNT(1) FROM `".SQL_PASSPROMPT_TABLE."` WHERE host=? AND passfail=1;") or make_error(S_SQLFAIL);
