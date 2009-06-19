@@ -2101,12 +2101,16 @@ sub make_backup_posts_panel($$$)
 	}
 	else
 	{
-		# Grab count of threads
-		my $threadcount = count_threads();
+		# Grab count of threads and orphaned posts.
+		$sth=$dbh->prepare("SELECT COUNT(1) FROM `".SQL_BACKUP_TABLE."` A  WHERE (parent=0 OR (parent>0 AND NOT EXISTS (SELECT * FROM `".SQL_BACKUP_TABLE."` B WHERE A.parent = B.num LIMIT 1))) AND board_name=? ORDER BY timestampofarchival DESC, num ASC ;") or make_error(S_SQLFAIL);
+		$sth->execute($board->path()) or make_error(S_SQLFAIL);
+
+		my $threadcount = ($sth->fetchrow_array)[0];
+		$sth->finish();
 		
 		# Handle page variable
 		my $last_page = int(($threadcount + $board->option('IMAGES_PER_PAGE') - 1) / $board->option('IMAGES_PER_PAGE'))-1; 
-		$page = $last_page if (($page) * $board->option('IMAGES_PER_PAGE') + 1 > $count);
+		$page = $last_page if (($page) * $board->option('IMAGES_PER_PAGE') + 1 > $threadcount);
 		$page = 0 if ($page !~ /^\d+$/);
 		my $thread_offset = $page * ($board->option('IMAGES_PER_PAGE'));
 		
