@@ -4223,7 +4223,7 @@ sub add_password_failure_to_database($;$$$)
 	$sth->finish();
 
 	# If number of failed sessions exceed PASSFAIL_THRESHOLD, ban user
-	ban_script_access($ENV{REMOTE_ADDR}) if ($failcount > PASSFAIL_THRESHOLD);
+	ban_script_access($ip) if ($failcount > PASSFAIL_THRESHOLD);
 }
 
 sub manage_script_bans()
