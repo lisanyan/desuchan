@@ -4272,6 +4272,9 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 		$ban_entries_found = 1 if m/RewriteEngine\s+On/i;
 		# $options_followsymlinks = 1 if m/Options.*?FollowSymLinks/i; # Unneeded
 		# $options_execcgi = 1 if m/Options.*?ExecCGI/i; # Unneeded
+
+		# If the host is already banned, skip this.
+		return if m/RewriteCond \%\{REMOTE_ADDR\} \^$ip\$/;
 	}
 	close HTACCESSREAD;
 
