@@ -4274,7 +4274,7 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 		# $options_execcgi = 1 if m/Options.*?ExecCGI/i; # Unneeded
 
 		# If the host is already banned, skip this.
-		return if m/RewriteCond \%\{REMOTE_ADDR\} \^$ip\$/;
+		return if m/RewriteCond \%\{REMOTE_ADDR\} \Q\^$ip\$\E/;
 	}
 	close HTACCESSREAD;
 
@@ -4284,7 +4284,7 @@ sub ban_script_access($)	# Variant of add_htaccess_entry. TODO: Merge the two.
 	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
 	print HTACCESS "\n".'# Script Ban added by Wakaba'."\n";
 	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
-	print HTACCESS 'RewriteRule (!wakaba_access_ban.html)$  http://'.$ENV{SERVER_NAME}.'/wakaba_access_ban.html'."\n";
+	print HTACCESS 'RewriteRule \.pl http://'.$ENV{SERVER_NAME}.'/wakaba_access_ban.html [R=301,L]'."\n";
 	# mod_rewrite entry. May need to be changed for different server software
 	close HTACCESS;
 }
