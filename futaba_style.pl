@@ -2137,6 +2137,8 @@ use constant SCRIPT_SECURITY_PANEL => compile_template(MANAGER_HEAD_INCLUDE.q{
 	<div align="center">
 		<h3>Unban Host From Script Access</h3>	
 		<form action="<var $self>" method="get">
+			<input type="hidden" name="task" value="unbanhost" />
+			<input type="hidden" name="board" value="<var $board-\>path()>" />
 			<label>IP Address: <input type="text" name="ip" /></label> <input type="submit" value="Forgive" />
 		</form>	
 	</div>

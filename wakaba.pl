@@ -4302,6 +4302,8 @@ sub manually_unban_script_access($$)
 	my ($admin, $ip) = @_;
 	my ($username,$accounttype) = check_password($admin,"mpost");
 
+	make_error("Admin privledges required.") if ($accounttype != "admin");
+
 	unban_script_access($ip);
 
 	# Reset number of failed sessions by deleting all relevant records.
@@ -6109,6 +6111,15 @@ while ( $query = new CGI::Fast )
 		make_resolved_report_page($admin, $page, $perpage, $sortby, $order);
 	}
 	
+	# Manually Unban Script Access (Admin Only)
+        elsif ($task eq "unbanhost")
+	{
+		my $admin = $query->cookie("wakaadmin");
+		my $ip = $query->param("ip");
+
+		manually_unban_script_access($admin, $ip);
+	}
+
 	# Post Searching (Staff Only)
 	elsif ($task eq "searchposts")
 	{
