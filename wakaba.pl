@@ -4396,8 +4396,10 @@ sub move_thread($$$)
 				    if ($$res{thumbnail} =~ /^$thumb_dir/ && -e $board->path().'/'.$$res{thumbnail} );
 		}
 
+		my $new_lasthit = time(); # Generate new value for lasthit field, set so the thread is at the top of the page once moved.
+
 		my $post_insert = $dbh->prepare("INSERT INTO `".$dest_board_object->option("SQL_TABLE")."` VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);") or ( $errors = 1 and make_error(S_SQLFAIL) );
-		$post_insert->execute($new_thread_id, $$res{timestamp}, time(), $$res{ip}, $$res{date},$$res{name}, $$res{trip}, $$res{email}, $$res{subject}, $$res{password}, $$res{comment}, $image_dest, $$res{size}, $$res{md5}, $$res{width}, $$res{height}, $thumb_dest || $$res{thumbnail}, $$res{tn_width}, $$res{tn_height}, $$res{lastedit}, $$res{lastedit_ip}, $$res{admin_post}, $$res{stickied}, $$res{locked}) or ( $errors = 1 and make_error(S_SQLFAIL) );
+		$post_insert->execute($new_thread_id, $$res{timestamp}, $new_lasthit, $$res{ip}, $$res{date},$$res{name}, $$res{trip}, $$res{email}, $$res{subject}, $$res{password}, $$res{comment}, $image_dest, $$res{size}, $$res{md5}, $$res{width}, $$res{height}, $thumb_dest || $$res{thumbnail}, $$res{tn_width}, $$res{tn_height}, $$res{lastedit}, $$res{lastedit_ip}, $$res{admin_post}, $$res{stickied}, $$res{locked}) or ( $errors = 1 and make_error(S_SQLFAIL) );
 		$post_insert->finish();
 
 		if (!$$res{parent})
