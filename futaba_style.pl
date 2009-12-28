@@ -300,7 +300,11 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
-				-(<em><var $size> B, <var $width>x<var $height></em>)</span>
+				-(<em>
+					<if ( $size <= 10240 ) ><var $size> B</if>
+					<if ( $size \> 10240 && $size < 1048576 ) ><var ( int ( $size/1024 * 100 ) ) / 100> KiB</if>
+					<if ( $size \>= 1048576 )><var ( int ( $size/1048576 * 100 ) ) / 100> MiB</if>
+				, <var $width>x<var $height></em>)</span>
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
 				<if $thumbnail>
@@ -599,7 +603,7 @@ use constant BAN_TEMPLATE => compile_template(q{
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <link rel="stylesheet" type="text/css" href="/site.css" />
-<title><const S_BADHOST> - Desuchan</title>
+<title><const S_BADHOST> - Cirnochan</title>
 </head>
 <body class="content">
     <div class="top">
