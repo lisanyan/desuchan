@@ -302,8 +302,8 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
 				-(<em>
 					<if ( $size <= 10240 ) ><var $size> B</if>
-					<if ( $size \> 10240 && $size < 1048576 ) ><var ( int ( $size/1024 * 100 ) ) / 100> KiB</if>
-					<if ( $size \>= 1048576 )><var ( int ( $size/1048576 * 100 ) ) / 100> MiB</if>
+					<if ( $size \> 10240 && $size < 1048576 ) ><var ( int ( $size/1024 * 100 + 0.5 ) ) / 100> KiB</if>
+					<if ( $size \>= 1048576 )><var ( int ( $size/1048576 * 100 + 0.5 ) ) / 100> MiB</if>
 				, <var $width>x<var $height></em>)</span>
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
