@@ -97,6 +97,11 @@ BEGIN { require "futaba_style.pl"; }
 #BEGIN { require "captcha.pl"; }
 BEGIN { require "wakautils.pl"; }
 
+if (ENABLE_RSS)
+{
+	use MIME::Types;
+}
+
 #
 # Global init
 #
@@ -247,6 +252,8 @@ sub build_cache()
 	}
 	
 	$sth->finish();
+
+	update_rss() if (ENABLE_RSS);
 }
 
 sub build_cache_page($$@)
@@ -327,6 +334,7 @@ sub build_thread_cache($)
 	my ($thread)=@_;
 	my ($sth,$row,@thread);
 	my ($filename,$tmpname);
+	my ($op,$posts_to_trim,$abbreviated_filename);
 
 	$sth=$dbh->prepare("SELECT * FROM `".$board->option('SQL_TABLE')."` WHERE num=? OR parent=? ORDER BY num ASC;") or make_error(S_SQLFAIL);
 	$sth->execute($thread,$thread) or make_error(S_SQLFAIL);
@@ -350,6 +358,54 @@ sub build_thread_cache($)
 		stylesheets=>get_stylesheets('thread'),
 		board=>$board
 	));
+
+	# Determine how many posts need to be cut.
+	$posts_to_trim = scalar(@thread) - POSTS_IN_ABBREVIATED_THREAD_PAGES;
+
+	# Filename for Last xx Posts Page.
+	$abbreviated_filename = $board->path().'/'.$board->option('RES_DIR').$thread."_abbr".$page_ext;
+
+	if (ENABLE_ABBREVIATED_THREAD_PAGES && $posts_to_trim > 1)
+	{
+		for (my $i = 0; $i < $posts_to_trim; ++$i)
+		{
+			if ($i == 0)
+			{
+				$op = shift(@thread);
+			}
+			else
+			{
+				shift(@thread);
+			}
+		}
+
+		unshift(@thread, $op);
+
+		print_page($abbreviated_filename,PAGE_TEMPLATE->(
+			threads=>[{posts=>\@thread}],
+			thread=>$thread,
+			omit=>$posts_to_trim-1, # Displayed number of omitted posts does not include OP.
+			postform=>($board->option('ALLOW_TEXT_REPLIES') or $board->option('ALLOW_IMAGE_REPLIES')),
+			image_inp=>$board->option('ALLOW_IMAGE_REPLIES'),
+			textonly_inp=>0,
+			dummy=>$thread[$#thread]{num},
+			lockedthread=>$thread[0]{locked},
+			stylesheets=>get_stylesheets('thread'),
+			board=>$board
+		));
+	}
+	else
+	{
+		unlink $abbreviated_filename if ( -e $abbreviated_filename );
+	}
+}
+
+sub delete_thread_cache($)
+{
+	my ($parent) = @_;
+
+	unlink $board->path.'/'.$board->option('RES_DIR').$parent.$page_ext;
+	unlink $board->path.'/'.$board->option('RES_DIR').$parent."_abbr".$page_ext;
 }
 
 sub print_page($$)
@@ -377,8 +433,7 @@ sub print_page($$)
 		close PAGE;
 	}
 	
-	chmod 0644, $filename; # Make world-readable
-	
+	chmod 0644, $filename; # Make world-readable	
 }
 
 sub build_thread_cache_all()
@@ -678,12 +733,25 @@ sub post_stuff($$$$$$$$$$$$$$$$$$$)
 	
 	if (!$admin_post_mode)
 	{
-		# forward back to the main page
-		make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT) unless $noko;
-		
-		# ...unless we have "noko" (a la 4chan)--then forward to thread
-		# ($parent contains current post number if a new thread was posted)
-		make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent.$page_ext,ALTERNATE_REDIRECT);
+		unless ($noko)
+		{
+			# forward back to the main page
+			make_http_forward($board->path().'/'.$board->option('HTML_SELF'),ALTERNATE_REDIRECT)
+		}
+		else
+		{
+			# ...unless we have "noko" (a la 4chan)--then forward to thread
+			# ($parent contains current post number if a new thread was posted)
+			unless (-e $board->path().'/'.$board->option('RES_DIR').$parent."_abbr".$page_ext)
+			{
+				make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent.$page_ext,ALTERNATE_REDIRECT);
+
+			}
+			else
+			{
+				make_http_forward($board->path().'/'.$board->option('RES_DIR').$parent."_abbr".$page_ext,ALTERNATE_REDIRECT);
+			}
+		}
 	}
 	else
 	{
@@ -1711,7 +1779,7 @@ sub process_file($$$$)
 	
 	# Check file type with UNIX utility file()
 	my $file_response = `file $filename`;
-	if ($file_response =~ /\:.*(?:script|text)/)
+	if ($file_response =~ /\:.*(?:script|text|executable)/)
 	{
 		unlink $filename;
 		make_error(S_BADFORMAT." Potential Exploit");
@@ -2014,7 +2082,7 @@ sub delete_post($$$$;$)
 					close RESIN;
 					close RESOUT;
 				}
-				unlink $board->path.'/'.$board->option('RES_DIR').$$row{num}.$page_ext;
+				delete_thread_cache($$row{num});
 			}
 			else # removing parent image
 			{
@@ -3701,6 +3769,45 @@ sub do_nuke_database($$)
 
 sub update_rss()
 {
+	my ($sth, $row);
+	my (@items);
+
+
+	# Retrieve records to be inserted into RSS.
+	$sth=$dbh->prepare("SELECT * FROM `".$board->option("SQL_TABLE")."` ORDER BY timestamp DESC LIMIT ".RSS_LENGTH.";") or make_error(S_SQLFAIL);
+	$sth->execute() or make_error(S_SQLFAIL);
+
+	while ($row=get_decoded_hashref($sth))
+	{
+		if ($$row{image})
+		{
+			my $extension = $$row{image};
+			$extension =~ s/^.*\.([^\.]+)$/$1/;
+
+			my $mime_types = MIME::Types->new(only_complete => 1);
+			my $mime_type_obj = $mime_types->mimeTypeOf($extension);
+
+			if ($mime_type_obj)
+			{
+				$$row{mime_type} = $mime_type_obj->type();
+			}
+			else
+			{
+				# Generic fallback.
+				$$row{mime_type} = "application/octet-stream";
+			}
+		}
+
+		push(@items, $row);
+	}
+
+	# Construct the RSS out of post data, using the usual template approach.
+	print_page($board->path()."/board.rss", encode_string(RSS_TEMPLATE->(
+		items=>\@items,
+		pub_date=>make_date(time, "http"), # Date RSS was generated.
+		board=>$board)));
+
+	$sth->finish();
 }
 
 #
@@ -3712,8 +3819,6 @@ sub add_htaccess_entry($)
 	my $ip = $_[0];
 	$ip =~ s/\./\\\./g;
 	my $ban_entries_found = 0;
-	# my $options_followsymlinks = 0;
-	# my $options_execcgi = 0;
 	open (HTACCESSREAD, HTACCESS_PATH.".htaccess") 
 	  or make_error(S_HTACCESSPROBLEM);
 	while (<HTACCESSREAD>)
@@ -3724,8 +3829,6 @@ sub add_htaccess_entry($)
 	}
 	close HTACCESSREAD;
 	open (HTACCESS, ">>".HTACCESS_PATH.".htaccess");
-#	print HTACCESS "\n".'Options +FollowSymLinks'."\n" if !$options_followsymlinks;
-#	print HTACCESS "\n".'Options +ExecCGI'."\n" if !$options_execcgi;
 	print HTACCESS "\n".'RewriteEngine On'."\n" if !$ban_entries_found;
 	print HTACCESS "\n".'# Ban added by Wakaba'."\n";
 	print HTACCESS 'RewriteCond %{REMOTE_ADDR} ^'.$ip.'$'."\n";
@@ -4427,7 +4530,7 @@ sub move_thread($$$)
 		$sth->finish();
 
 		# Delete thread page.
-		unlink $board->path.'/'.$board->option('RES_DIR').$op_id.$page_ext;
+		delete_thread_cache($op_id);
 
 		# Build cache of current board.
 		build_cache();
@@ -4480,12 +4583,12 @@ sub expand_image_filename($)
 	return $self_path.$board.'/'.$board->option('REDIR_DIR').clean_path($1).'.html';
 }
 
-sub get_reply_link($$)
+sub get_reply_link($$;$$)
 {
-	my ($reply,$parent)=@_;
+	my ($reply,$parent,$abbreviated,$force_http)=@_;
 
-	return expand_filename($board->option('RES_DIR').$parent.$page_ext).'#'.$reply if($parent);
-	return expand_filename($board->option('RES_DIR').$reply.$page_ext);
+	return expand_filename($board->option('RES_DIR').$parent.(($abbreviated) ? "_abbr" : "").$page_ext,$force_http).'#'.$reply if($parent);
+	return expand_filename($board->option('RES_DIR').$reply.(($abbreviated) ? "_abbr" : "").$page_ext,$force_http);
 }
 
 sub get_page_count($$$)

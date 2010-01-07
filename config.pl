@@ -38,6 +38,14 @@ use constant SQL_PASSWORD => 'helpless912';		# MySQL password
 #use constant POST_BACKUP=>1;				# 1: Back up posts that are deleted or edited. 0: Do not back up.
 #use constant POST_BACKUP_EXPIRE => 3600*24*14;		# How long should backups last prior to purging?
 
+# use constant ENABLE_ABBREVIATED_THREAD_PAGES => 1;	# Want to enable "Last xx Posts?" Then set this to 1.
+# use constant POSTS_IN_ABBREVIATED_THREAD_PAGES => 50;	# Number of posts to show in abbreviated reply views.
+
+# use constant ENABLE_RSS => 1;				# Do RSS feeds.
+# use constant RSS_LENGTH => 10;			# Number of items in each feed.
+# use constant RSS_WEBMASTER => "dark.master.schmidt@gmail.com (Dark^Master^Schmidt)";
+							# Webmaster email address and name. Example format should be preserved for RSS spec.
+
 # no encoding;
 
 1;

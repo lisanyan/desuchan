@@ -62,6 +62,13 @@ BEGIN {
 	eval "use constant PASSPROMPT_EXPIRE_TO_FAILURE => 300" unless defined (&PASSPROMPT_EXPIRE_TO_FAILURE);
 	eval "use constant PASSFAIL_THRESHOLD => 5" unless defined (&PASSFAIL_THRESHOLD);
 	eval "use constant PASSFAIL_ROLLBACK => 1*24*3600" unless defined (&PASSFAIL_ROLLBACK);
+
+	eval "use constant ENABLE_ABBREVIATED_THREAD_PAGES => 0" unless defined (&ENABLE_ABBREVIATED_THREAD_PAGES);
+	eval "use constant POSTS_IN_ABBREVIATED_THREAD_PAGES => 50" unless defined (&POSTS_IN_ABBREVIATED_THREAD_PAGES);
+
+	eval "use constant ENABLE_RSS => 1" unless defined (&ENABLE_RSS);
+	eval "use constant RSS_LENGTH => 10" unless defined (&RSS_LENGTH);
+	eval "use constant RSS_WEBMASTER => ''" unless defined (&RSS_WEBMASTER);
 }
 
 1;

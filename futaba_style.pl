@@ -60,6 +60,7 @@ use constant NORMAL_HEAD_INCLUDE => q{
 </loop>
 -
 [<a href="<var expand_filename(HOME)>" target="_top"><const S_HOME></a>]
+[<a href="<var expand_filename("board.rss",1)>"><img src="<var expand_filename("../rss.png")>" style="border:0" /> RSS</a>]
 [<a href="<var get_secure_script_name()>?task=loginpanel&amp;board=<var $board-\>path()>"><const S_ADMIN></a>]
 </div>
 
@@ -186,7 +187,12 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 <if $lockedthread ne 'yes'>
 <if $thread>
 	[<a href="<var expand_filename($board-\>option('HTML_SELF'))>"><const S_RETURN></a>]
-	<div class="theader"><const S_POSTING></div>
+	<if !$omit>
+		<div class="theader"><const S_POSTING></div>
+	</if>
+	<if $omit>
+		<div class="theader">Posting Mode: Reply (Abbreviated Thread View)</div>
+	</if>
 </if>
 
 <div class="globalannounce">}.include("include/announcements_global.html").q{</div>
@@ -300,11 +306,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<div id="t<var $num>">
 			<if $image>
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
-				-(<em>
-					<if ( $size <= 10240 ) ><var $size> B</if>
-					<if ( $size \> 10240 && $size < 1048576 ) ><var ( int ( $size/1024 * 100 + 0.5 ) ) / 100> KiB</if>
-					<if ( $size \>= 1048576 )><var ( int ( $size/1048576 * 100 + 0.5 ) ) / 100> MiB</if>
-				, <var $width>x<var $height></em>)</span>
+				-(<em><if ( $size <= 10240 ) ><var $size> B</if><if ( $size \> 10240 && $size < 1048576 ) ><var round_decimal($size/1024, 1)> KiB</if><if ( $size \>= 1048576 )><var round_decimal($size/1048576, 1)> MiB</if>, <var $width>x<var $height></em>)</span>
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
 				<if $thumbnail>
@@ -340,22 +342,28 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
 			<if !$thread>
-			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a>]</if>
+			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a><if ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES>/<a href="<var get_reply_link($num,0,1)>">Last <const POSTS_IN_ABBREVIATED_THREAD_PAGES></a></if>]</if>
 			<if $locked eq 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_VIEW></a>]</if>
 			</if>
 
 			<blockquote>
 			<var $comment>
-			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,get_reply_link($num,$parent))></div></if>
+			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,(ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent))></div></if>
 			<if $lastedit><p style="font-size: small; font-style: italic"><const S_LASTEDITED><if $admin_post eq 'yes'> <const S_BYMOD></if> <var $lastedit>.</p></if>
 			</blockquote>
 
-			<if $omit>
+			<if !$thread && $omit>
 				<span class="omittedposts">
 				<if $omitimages && !$locked><var sprintf S_ABBRIMG,$omit,$omitimages></if>
 				<if $omitimages && $locked><var sprintf S_ABBRIMG_LOCK, $omit, $omitimages></if>
 				<if !$omitimages && !$locked><var sprintf S_ABBR,$omit></if>
 				<if !$omitimages && $locked><var sprintf S_ABBR_LOCK,$omit></if>
+				</span>
+			</if>
+			<if $thread && $omit>
+				<span class="omittedposts">
+					This page shows only the latest <const POSTS_IN_ABBREVIATED_THREAD_PAGES> replies to this thread.
+					For the other <var $omit>, refer to <a href="<var get_reply_link($thread,0)>">the full thread page</a>.
 				</span>
 			</if>
 			<if !$thread>
@@ -390,7 +398,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			<if $image>
 				<br />
 				<span class="filesize"><const S_PICNAME><a target="_blank" href="<var expand_image_filename($image)>"><var get_filename($image)></a>
-				-(<em><var $size> B, <var $width>x<var $height></em>)</span>
+				-(<em><if ( $size <= 10240 ) ><var $size> B</if><if ( $size \> 10240 && $size < 1048576 ) ><var round_decimal($size/1024, 1)> KiB</if><if ( $size \>= 1048576 )><var round_decimal($size/1048576, 1)> MiB</if>, <var $width>x<var $height></em>)</span>
 				<span class="thumbnailmsg"><const S_THUMB></span><br />
 
 				<if $thumbnail>
@@ -410,7 +418,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 			<blockquote>
 			<var $comment>
-			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,get_reply_link($num,$parent))></div></if>
+			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,(ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent))></div></if>
 			<if $lastedit><p style="font-size: small; font-style: italic">Last edited<if $admin_post eq 'yes'> by moderator</if> <var $lastedit>.</p></if>
 			</blockquote>
 
@@ -2639,9 +2647,54 @@ use constant OEKAKI_POST_EDIT_TEMPLATE => compile_template(MINI_HEAD_INCLUDE.q{
 }.MINI_FOOT_INCLUDE);
 
 #
+# RSS
+#
+
+use constant RSS_TEMPLATE => compile_template("".q{
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <atom:link href="<var expand_filename("board.rss", 1)>" rel="self" type="application/rss+xml" />
+    <title><var $board-\>option("TITLE")>: Latest Posts</title>
+    <link><var expand_filename("", 1)></link>
+    <description>The latest threads and replies in <var $board-\>option("TITLE")> at <var $ENV{SERVER_NAME}>, updated in realtime.</description>
+    <pubDate><var $pub_date></pubDate>
+    <lastBuildDate><var $pub_date></lastBuildDate>
+    <generator>Wakaba + desuchan</generator>
+    <if RSS_WEBMASTER><webMaster><const RSS_WEBMASTER></webMaster></if>
+    <docs>http://validator.w3.org/feed/docs/rss2.html</docs>
+    <loop $items>
+      <item>
+        <title>
+          Post #<var $num><if !$parent> (New Topic)</if><if $subject>: <var $subject></if>
+        </title>
+        <if $email && $email =~ /\@/><author><var $email><if $name || $trip> (<var $name><var $trip>)</if><if !$name && !$trip> (<var $board-\>option("S_ANONAME")>)</if></author></if>
+        <if !$email || $email !~ /\@/><dc:creator><if $name || $trip><var $name><var $trip></if><if !$name && !$trip><var $board-\>option("S_ANONAME")></if></dc:creator></if>
+        <if $comment>
+          <description><![CDATA[<var $comment>]]></description>
+        </if>
+        <if $image>
+          <enclosure url="<var expand_filename($image, 1)>" length="<var $size>" type="<var $mime_type>" />
+        </if>
+        <pubDate><var make_date($timestamp, "http")></pubDate>
+        <link><var get_reply_link($num, $parent, 0, 1)></link>
+	<guid><var get_reply_link($num, $parent, 0, 1)></guid>
+      </item>
+    </loop>
+  </channel>
+</rss>
+});
+
+#
 # Template-Specific Functions
 #
 
 sub get_filename($) { my $path=shift; $path=~m!([^/]+)$!; clean_string($1); }
+
+sub round_decimal($$)
+{
+	my ($number, $places_behind_decimal) = @_;
+	return (int ($number * 10**$places_behind_decimal + 0.5)) / (10**$places_behind_decimal);
+}
 
 1;
