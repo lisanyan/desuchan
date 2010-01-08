@@ -60,7 +60,7 @@ use constant NORMAL_HEAD_INCLUDE => q{
 </loop>
 -
 [<a href="<var expand_filename(HOME)>" target="_top"><const S_HOME></a>]
-[<a href="<var expand_filename("board.rss",1)>"><img src="<var expand_filename("../rss.png")>" style="border:0" /> RSS</a>]
+[<a href="<var expand_filename("board.rss",1)>" title="Local RSS Feed for This Board"><img src="<var expand_filename("../rss.png")>" style="border:0" alt="RSS" /> Live Feed</a>]
 [<a href="<var get_secure_script_name()>?task=loginpanel&amp;board=<var $board-\>path()>"><const S_ADMIN></a>]
 </div>
 
@@ -342,13 +342,13 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 			</span>&nbsp;
 			[<a href="<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>" target="_blank" onclick="popUpPost('<var $self>?task=edit&amp;board=<var $board-\>path>&amp;num=<var $num><if $admin_post eq 'yes'>&amp;admin_post=1</if>'); return false">Edit</a>]&nbsp;
 			<if !$thread>
-			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a><if ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES>/<a href="<var get_reply_link($num,0,1)>">Last <const POSTS_IN_ABBREVIATED_THREAD_PAGES></a></if>]</if>
+			<if $locked ne 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_REPLY></a><if ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("REPLIES_PER_THREAD") \> POSTS_IN_ABBREVIATED_THREAD_PAGES>/<a href="<var get_reply_link($num,0,1)>">Last <const POSTS_IN_ABBREVIATED_THREAD_PAGES></a></if>]</if>
 			<if $locked eq 'yes'>[<a href="<var get_reply_link($num,0)>"><const S_VIEW></a>]</if>
 			</if>
 
 			<blockquote>
 			<var $comment>
-			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,(ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent))></div></if>
+			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,(ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("REPLIES_PER_THREAD") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent))></div></if>
 			<if $lastedit><p style="font-size: small; font-style: italic"><const S_LASTEDITED><if $admin_post eq 'yes'> <const S_BYMOD></if> <var $lastedit>.</p></if>
 			</blockquote>
 
@@ -418,7 +418,7 @@ use constant PAGE_TEMPLATE => compile_template(NORMAL_HEAD_INCLUDE.q{
 
 			<blockquote>
 			<var $comment>
-			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,(ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("IMAGES_PER_PAGE") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent))></div></if>
+			<if $abbrev><div class="abbrev"><var sprintf(S_ABBRTEXT,((ENABLE_ABBREVIATED_THREAD_PAGES && $omit && $omit + $board-\>option("REPLIES_PER_THREAD") \> POSTS_IN_ABBREVIATED_THREAD_PAGES) ? get_reply_link($num,$parent,1) : get_reply_link($num,$parent)))></div></if>
 			<if $lastedit><p style="font-size: small; font-style: italic">Last edited<if $admin_post eq 'yes'> by moderator</if> <var $lastedit>.</p></if>
 			</blockquote>
 

@@ -63,6 +63,8 @@ BEGIN {
 	eval "use constant PASSFAIL_THRESHOLD => 5" unless defined (&PASSFAIL_THRESHOLD);
 	eval "use constant PASSFAIL_ROLLBACK => 1*24*3600" unless defined (&PASSFAIL_ROLLBACK);
 
+	eval "use constant REPLIES_PER_STICKY => 1" unless (defined &REPLIES_PER_STICKY);
+
 	eval "use constant ENABLE_ABBREVIATED_THREAD_PAGES => 0" unless defined (&ENABLE_ABBREVIATED_THREAD_PAGES);
 	eval "use constant POSTS_IN_ABBREVIATED_THREAD_PAGES => 50" unless defined (&POSTS_IN_ABBREVIATED_THREAD_PAGES);
 

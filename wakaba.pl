@@ -273,17 +273,26 @@ sub build_cache_page($$@)
 		my $images=grep { $$_{image} } @replies;
 		my $curr_replies=$replies;
 		my $curr_images=$images;
+		my $max_replies;
 		
 		# Abbreviation setings -- Stickied threads have their own setting
-		my $max_replies=$board->option('REPLIES_PER_THREAD');
+		if ( $$parent{stickied} )
+                {
+			$max_replies=REPLIES_PER_STICKY;
+                }
+		else
+		{
+			$max_replies=$board->option('REPLIES_PER_THREAD');
+		}
+
 		my $max_images=($board->option('IMAGE_REPLIES_PER_THREAD') or $images);
 
 		# drop replies until we have few enough replies and images
 		while($curr_replies>$max_replies or $curr_images>$max_images)
 		{
 			my $post=shift @replies;
-			$curr_images-- if($$post{image});
-			$curr_replies--;
+			--$curr_images if($$post{image});
+			--$curr_replies;
 		}
 
 		# write the shortened list of replies back
